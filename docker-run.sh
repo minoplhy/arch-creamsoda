@@ -26,16 +26,36 @@ docker build \
   -t "${IMAGE_NAME}" \
   "${SCRIPT_DIR}"
 
+# Resolve the Git common directory (bare repository base database)
+# When working with git worktrees, the actual .git files and databases are inside the bare repository
+# which might lie outside of the active worktree workspace path. We must mount it as well.
+GIT_BARE_DIR=""
+if git -C "${WORKSPACE_DIR}" rev-parse --git-dir &>/dev/null; then
+  COMMON_DIR=$(git -C "${WORKSPACE_DIR}" rev-parse --git-common-dir)
+  # Resolve to absolute path safely
+  GIT_BARE_DIR="$(cd "${WORKSPACE_DIR}" && cd "${COMMON_DIR}" && pwd)"
+fi
+
+EXTRA_MOUNTS=()
+if [ -n "${GIT_BARE_DIR}" ] && [[ "${GIT_BARE_DIR}" != "${WORKSPACE_DIR}"* ]]; then
+  echo "Detected external bare Git directory at: ${GIT_BARE_DIR}"
+  echo "Mounting Git directory to preserve worktree metadata..."
+  EXTRA_MOUNTS+=("-v" "${GIT_BARE_DIR}:${GIT_BARE_DIR}")
+fi
+
 echo "--------------------------------------------------------------------------------"
 echo "Starting container '${CONTAINER_NAME}' in privileged mode..."
 echo "All files compiled will be owned by user '$(id -un)' ($(id -u):$(id -g))."
 echo "--------------------------------------------------------------------------------"
 
 # Run the docker container in privileged mode
-# - Mounts the workspace root to /workspace
+# - Mounts the workspace to the identical absolute path inside the container to preserve git worktree links
 # - Mounts the pacman package cache to /var/cache/pacman/pkg inside the container
+# - Mounts the external bare Git repository directory if it lies outside the workspace
 docker run --privileged -it --rm \
-  -v "${WORKSPACE_DIR}:/workspace" \
+  -v "${WORKSPACE_DIR}:${WORKSPACE_DIR}" \
+  -w "${WORKSPACE_DIR}" \
   -v "${WORKSPACE_DIR}/cache/packages:/var/cache/pacman/pkg" \
+  "${EXTRA_MOUNTS[@]}" \
   --name "${CONTAINER_NAME}" \
   "${IMAGE_NAME}"

@@ -193,21 +193,21 @@ A self-contained helper script designed to configure and manage git worktrees fr
 
 ### CI/CD Server Usage Example (Via Curl)
 
-This script is fully standalone and can be curled directly onto any remote build server or runner:
+This script is fully standalone and can be curled directly onto any remote build server or runner. It is recommended to clone the bare repository inside a hidden `.bare/` folder in your workspace root to keep the environment self-contained:
 
 ```bash
 # 1. Download and make executable
 curl -sSL -o git-bare-worktree.sh https://raw.githubusercontent.com/username/repo/main/git-bare-worktree.sh
 chmod +x git-bare-worktree.sh
 
-# 2. Setup the bare database clone
-./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/repo.git"
+# 2. Setup the bare database clone inside the workspace under .bare/
+./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/workspace/.bare"
 
 # 3. Sync all package branches into worktrees under packages/
-./git-bare-worktree.sh sync-packages "/var/lib/builds/repo.git" "/var/lib/builds/workspace/packages"
+./git-bare-worktree.sh sync-packages "/var/lib/builds/workspace/.bare" "/var/lib/builds/workspace/packages"
 
-# 4. Sync the master build workspace branch
-./git-bare-worktree.sh sync "/var/lib/builds/repo.git" "master" "/var/lib/builds/workspace"
+# 4. Sync the master build workspace branch to the workspace root
+./git-bare-worktree.sh sync "/var/lib/builds/workspace/.bare" "master" "/var/lib/builds/workspace"
 
 # 5. Run the builder to compile outstanding package updates
 cd "/var/lib/builds/workspace"
