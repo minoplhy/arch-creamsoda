@@ -42,9 +42,9 @@ create_package() {
       git worktree add --orphan -b "$pkgname" "$target_dir" >/dev/null 2>&1
       
       # Populate skeleton template files
-      cp "${WORKSPACE_DIR}/templates/PKGBUILD.proto" "${target_dir}/PKGBUILD"
+      cp "${ENGINE_DIR}/templates/PKGBUILD.proto" "${target_dir}/PKGBUILD"
       sed -i "s/_PKGNAME_/${pkgname}/g" "${target_dir}/PKGBUILD"
-      cp "${WORKSPACE_DIR}/templates/pkgconfig.proto" "${target_dir}/.pkgconfig"
+      cp "${ENGINE_DIR}/templates/pkgconfig.proto" "${target_dir}/.pkgconfig"
       
       log_success "Package '${pkgname}' created from scratch at: ${target_dir}"
       log_info "No initial commit was created. Please edit PKGBUILD and run 'git add' and 'git commit' inside ${target_dir} to create the first commit."
@@ -56,9 +56,9 @@ create_package() {
       git worktree add --orphan -b "$pkgname" "$target_dir" >/dev/null 2>&1
       
       # Populate skeleton templates from main branch
-      cp "${WORKSPACE_DIR}/templates/PKGBUILD.proto" "${target_dir}/PKGBUILD"
+      cp "${ENGINE_DIR}/templates/PKGBUILD.proto" "${target_dir}/PKGBUILD"
       sed -i "s/_PKGNAME_/${pkgname}/g" "${target_dir}/PKGBUILD"
-      cp "${WORKSPACE_DIR}/templates/pkgconfig.proto" "${target_dir}/.pkgconfig"
+      cp "${ENGINE_DIR}/templates/pkgconfig.proto" "${target_dir}/.pkgconfig"
       
       # For copy-main, we commit the template files to start with an initial commit
       cd "$target_dir" || exit 1
@@ -139,7 +139,7 @@ create_package() {
 
       # Add default .pkgconfig if not present in the cloned repository
       if [ ! -f "${target_dir}/.pkgconfig" ]; then
-        cp "${WORKSPACE_DIR}/templates/pkgconfig.proto" "${target_dir}/.pkgconfig"
+        cp "${ENGINE_DIR}/templates/pkgconfig.proto" "${target_dir}/.pkgconfig"
         # Since it is a clone, we configure TRACKING_MODE="aur" by default in .pkgconfig
         sed -i 's/TRACKING_MODE="source"/TRACKING_MODE="aur"/g' "${target_dir}/.pkgconfig"
       fi
