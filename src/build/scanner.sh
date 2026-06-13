@@ -2,7 +2,7 @@
 # Sources common.sh and src/manage/version.sh
 
 # shellcheck source=src/manage/version.sh
-source "${WORKSPACE_DIR}/src/manage/version.sh"
+source "${ENGINE_DIR}/src/manage/version.sh"
 
 scan_packages_for_changes() {
   # Declare global associative array for packages to build

@@ -11,19 +11,19 @@ init_dirs
 
 # Sourcing management modules
 # shellcheck source=src/manage/create.sh
-source "${WORKSPACE_DIR}/src/manage/create.sh"
+source "${ENGINE_DIR}/src/manage/create.sh"
 # shellcheck source=src/manage/delete.sh
-source "${WORKSPACE_DIR}/src/manage/delete.sh"
+source "${ENGINE_DIR}/src/manage/delete.sh"
 # shellcheck source=src/manage/list.sh
-source "${WORKSPACE_DIR}/src/manage/list.sh"
+source "${ENGINE_DIR}/src/manage/list.sh"
 # shellcheck source=src/manage/version.sh
-source "${WORKSPACE_DIR}/src/manage/version.sh"
+source "${ENGINE_DIR}/src/manage/version.sh"
 # shellcheck source=src/manage/upgrade.sh
-source "${WORKSPACE_DIR}/src/manage/upgrade.sh"
+source "${ENGINE_DIR}/src/manage/upgrade.sh"
 # shellcheck source=src/manage/keys.sh
-source "${WORKSPACE_DIR}/src/manage/keys.sh"
+source "${ENGINE_DIR}/src/manage/keys.sh"
 # shellcheck source=src/manage/publish.sh
-source "${WORKSPACE_DIR}/src/manage/publish.sh"
+source "${ENGINE_DIR}/src/manage/publish.sh"
 
 show_help() {
   echo -e "Arch Linux AUR-Based Repository Management CLI"

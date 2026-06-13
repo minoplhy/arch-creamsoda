@@ -3,7 +3,7 @@
 
 # Sourcing list.sh to reuse parse_pkgbuild_version
 # shellcheck source=src/manage/list.sh
-source "${WORKSPACE_DIR}/src/manage/list.sh"
+source "${ENGINE_DIR}/src/manage/list.sh"
 
 get_local_version() {
   local pkgname="$1"

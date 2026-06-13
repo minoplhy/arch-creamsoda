@@ -10,6 +10,10 @@ if [ -z "$WORKSPACE_DIR" ]; then
 fi
 export WORKSPACE_DIR
 
+# Resolve engine root directory
+ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export ENGINE_DIR
+
 # Define log levels with colors
 COLOR_RESET="\033[0m"
 COLOR_INFO="\033[1;34m"    # Bold Blue

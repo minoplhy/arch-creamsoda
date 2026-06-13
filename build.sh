@@ -11,9 +11,9 @@ init_dirs
 
 # Sourcing build modules
 # shellcheck source=src/build/scanner.sh
-source "${WORKSPACE_DIR}/src/build/scanner.sh"
+source "${ENGINE_DIR}/src/build/scanner.sh"
 # shellcheck source=src/build/compiler.sh
-source "${WORKSPACE_DIR}/src/build/compiler.sh"
+source "${ENGINE_DIR}/src/build/compiler.sh"
 
 show_help() {
   echo -e "Arch Linux Repository Automation Builder"
