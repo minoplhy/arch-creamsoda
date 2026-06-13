@@ -12,6 +12,8 @@ source "${WORKSPACE_DIR}/tests/test_helper.sh"
 source "${WORKSPACE_DIR}/tests/test_manage.sh"
 # shellcheck source=tests/test_build.sh
 source "${WORKSPACE_DIR}/tests/test_build.sh"
+# shellcheck source=tests/test_worktree.sh
+source "${WORKSPACE_DIR}/tests/test_worktree.sh"
 
 # Global tracking variable for test failures
 TEST_FAILED=0
@@ -39,3 +41,7 @@ run_manage_tests
 
 # Run build automation tests
 run_build_tests
+
+# Run bare worktree tests
+run_worktree_tests
+

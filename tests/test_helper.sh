@@ -23,6 +23,7 @@ setup_sandbox() {
   cp "${WORKSPACE_DIR}/config.conf" "$SANDBOX_DIR/"
   cp "${WORKSPACE_DIR}/manage.sh" "$SANDBOX_DIR/"
   cp "${WORKSPACE_DIR}/build.sh" "$SANDBOX_DIR/"
+  cp "${WORKSPACE_DIR}/git-bare-worktree.sh" "$SANDBOX_DIR/"
   
   # Initialize git repository in sandbox
   cd "$SANDBOX_DIR" || exit 1

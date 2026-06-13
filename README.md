@@ -144,3 +144,46 @@ mkarchroot cache/chroot/root base-devel
   ```bash
   ./build.sh --force-rebuild
   ```
+
+---
+
+## Remote Build Server Worktree Automation (`git-bare-worktree.sh`)
+
+A self-contained helper script designed to configure and manage git worktrees from bare repositories on remote build servers. It maps all remote branches cleanly under the remote tracking namespace (`refs/remotes/origin/*`) and checks out worktrees using tracking branches (Option B) for optimal observability. It also includes automatic recursive submodule initialization.
+
+### Commands
+
+1. **Setup Bare Repository:**
+   Clones the repository as bare and maps branches cleanly:
+   ```bash
+   ./git-bare-worktree.sh setup <remote_url> <bare_repo_path>
+   ```
+
+2. **Sync Branch into Worktree:**
+   Fetches latest remote references, updates or creates the local tracking branch pointing to `origin/<branch_name>` for tracking visibility, and initializes/updates all submodules recursively:
+   ```bash
+   ./git-bare-worktree.sh sync <bare_repo_path> <branch_name> <worktree_path>
+   ```
+
+3. **Cleanup Worktree:**
+   Removes the worktree and prunes git administrative metadata:
+   ```bash
+   ./git-bare-worktree.sh cleanup <bare_repo_path> <worktree_path>
+   ```
+
+### CI/CD Server Usage Example (Via Curl)
+
+This script is fully standalone and can be curled directly onto any remote build server or runner:
+
+```bash
+# 1. Download and make executable
+curl -sSL -o git-bare-worktree.sh https://raw.githubusercontent.com/username/repo/main/git-bare-worktree.sh
+chmod +x git-bare-worktree.sh
+
+# 2. Setup the bare database clone
+./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/repo.git"
+
+# 3. Checkout target branch (with automatic recursive submodule setup)
+./git-bare-worktree.sh sync "/var/lib/builds/repo.git" "main" "/var/lib/builds/workspace"
+```
+
