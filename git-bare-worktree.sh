@@ -47,6 +47,10 @@ Commands:
     pointing to origin/<branch_name> (Option B for observability), and checks 
     it out to <worktree_path> as a worktree.
 
+  sync-packages <bare_path> <packages_dir>
+    Fetches remote refs once, scans all remote package branches, and syncs/checkouts 
+    them as tracking worktrees under <packages_dir>/<package_name>.
+
   cleanup <bare_path> <worktree_path>
     Gracefully and forcefully removes the worktree at <worktree_path> and 
     prunes git worktree administrative metadata.
@@ -236,6 +240,57 @@ cmd_update() {
   log_success "Bare repository database updated successfully."
 }
 
+cmd_sync_packages() {
+  local bare_path="$1"
+  local packages_dir="$2"
+
+  if [ -z "$bare_path" ] || [ -z "$packages_dir" ]; then
+    log_error "Missing required arguments for sync-packages."
+    echo "Usage: $0 sync-packages <bare_path> <packages_dir>"
+    exit 1
+  fi
+
+  local abs_bare_path
+  abs_bare_path=$(mkdir -p "$bare_path" && cd "$bare_path" && pwd)
+
+  if [ ! -d "$abs_bare_path" ] || ! git -C "$abs_bare_path" rev-parse --is-bare-repository &>/dev/null; then
+    log_error "Invalid bare repository path: ${bare_path}"
+    exit 1
+  fi
+
+  # Step 1: Update bare repository database
+  log_info "Updating bare repository references..."
+  git -C "$abs_bare_path" fetch origin --prune
+
+  # Step 2: Query remote branches
+  log_info "Scanning package branches from remote tracking references..."
+  local branches=()
+  while read -r short_ref; do
+    # Ensure reference format is origin/<branch_name>
+    if [[ "$short_ref" != origin/* ]]; then
+      continue
+    fi
+    local branch_name="${short_ref#origin/}"
+    # Ignore main branches, HEAD pointer, and upgrade/PR branches
+    if [ "$branch_name" = "master" ] || [ "$branch_name" = "main" ] || [ "$branch_name" = "HEAD" ] || [[ "$branch_name" == upgrade-* ]]; then
+      continue
+    fi
+    branches+=("$branch_name")
+  done < <(git -C "$abs_bare_path" for-each-ref --format='%(refname:short)' refs/remotes/origin/)
+
+  log_info "Found ${#branches[@]} package branches to sync."
+
+  # Step 3: Sync each package branch worktree
+  for branch_name in "${branches[@]}"; do
+    log_info "--------------------------------------------------------------------------------"
+    log_info "Syncing package worktree: ${branch_name}"
+    log_info "--------------------------------------------------------------------------------"
+    cmd_sync "$abs_bare_path" "$branch_name" "${packages_dir}/${branch_name}"
+  done
+
+  log_success "All ${#branches[@]} package worktrees synced successfully under ${packages_dir}."
+}
+
 # Command Router
 cmd="${1:-}"
 case "$cmd" in
@@ -246,6 +301,10 @@ case "$cmd" in
   sync)
     shift
     cmd_sync "$@"
+    ;;
+  sync-packages)
+    shift
+    cmd_sync_packages "$@"
     ;;
   update)
     shift

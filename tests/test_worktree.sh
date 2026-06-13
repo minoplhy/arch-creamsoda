@@ -180,6 +180,24 @@ run_worktree_tests() {
   assert_file_not_exists "${worktree_dir}/build_output.log" "Untracked files are removed"
 
 
+  # Test Case 5b: Sync all packages (sync-packages)
+  log_info "TEST: Sync all packages (sync-packages)..."
+  local packages_sandbox_dir="${SANDBOX_DIR}/packages-test"
+  mkdir -p "$packages_sandbox_dir"
+  
+  # Clean up previous worktree from earlier tests to free the local branch checkout lock
+  assert_success "${script_path} cleanup \"${bare_repo}\" \"${worktree_dir}\"" "Cleanup worktree-target before sync-packages"
+  
+  assert_success "${script_path} sync-packages \"${bare_repo}\" \"${packages_sandbox_dir}\"" "Sync all packages command"
+  
+  # Assert that all package branches are checked out under packages_sandbox_dir
+  # In our setup, we have "feature-test" and "new-branch-for-update"
+  assert_file_exists "${packages_sandbox_dir}/feature-test/feature.txt" "Synced feature-test package worktree exists"
+  assert_file_exists "${packages_sandbox_dir}/new-branch-for-update/update-test.txt" "Synced new-branch-for-update package worktree exists"
+  assert_file_not_exists "${packages_sandbox_dir}/master" "master branch is ignored"
+  assert_file_not_exists "${packages_sandbox_dir}/main" "main branch is ignored"
+
+
   # Test Case 6: Cleanup worktree
   log_info "TEST: Cleanup worktree..."
   assert_success "${script_path} cleanup \"${bare_repo}\" \"${worktree_dir}\"" "Cleanup worktree command"

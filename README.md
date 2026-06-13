@@ -165,7 +165,13 @@ A self-contained helper script designed to configure and manage git worktrees fr
    ./git-bare-worktree.sh sync <bare_repo_path> <branch_name> <worktree_path>
    ```
 
-3. **Cleanup Worktree:**
+3. **Sync All Package Branches:**
+   Fetches remote refs, automatically scans all package branches, and checks them out under the specified target directory:
+   ```bash
+   ./git-bare-worktree.sh sync-packages <bare_repo_path> <packages_dir_path>
+   ```
+
+4. **Cleanup Worktree:**
    Removes the worktree and prunes git administrative metadata:
    ```bash
    ./git-bare-worktree.sh cleanup <bare_repo_path> <worktree_path>
@@ -183,7 +189,14 @@ chmod +x git-bare-worktree.sh
 # 2. Setup the bare database clone
 ./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/repo.git"
 
-# 3. Checkout target branch (with automatic recursive submodule setup)
-./git-bare-worktree.sh sync "/var/lib/builds/repo.git" "main" "/var/lib/builds/workspace"
+# 3. Sync all package branches into worktrees under packages/
+./git-bare-worktree.sh sync-packages "/var/lib/builds/repo.git" "/var/lib/builds/workspace/packages"
+
+# 4. Sync the master build workspace branch
+./git-bare-worktree.sh sync "/var/lib/builds/repo.git" "master" "/var/lib/builds/workspace"
+
+# 5. Run the builder to compile outstanding package updates
+cd "/var/lib/builds/workspace"
+./arch-creamsoda/build.sh
 ```
 
