@@ -1,0 +1,24 @@
+# Maintainer: Arch Repo System Administrator <admin@example.com>
+pkgname=_PKGNAME_
+pkgver=0.0.1
+pkgrel=1
+pkgdesc="A new package created from scratch"
+arch=('any')
+url="https://example.com"
+license=('GPL')
+depends=()
+makedepends=()
+source=()
+sha256sums=()
+
+build() {
+  # Add build commands here
+  true
+}
+
+package() {
+  # Add package installation commands here
+  # For example:
+  # install -Dm755 "${srcdir}/${pkgname}" "${pkgdir}/usr/bin/${pkgname}"
+  true
+}

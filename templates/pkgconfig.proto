@@ -1,0 +1,16 @@
+# Per-package repository settings.
+# This configuration is stored within the package branch and tracked by Git.
+
+# Tracking mode for the package update checks.
+# "source" - Track actual project releases (VCS updates using pkgver() or direct release tags check).
+# "aur"    - Track package wrapper updates published on the Arch User Repository (AUR).
+TRACKING_MODE="source"
+
+# Upstream URL to override auto-detection for updates (optional).
+UPSTREAM_URL=""
+
+# Conflict resolution strategy for automatic upgrades.
+# "abort"  - Fail the upgrade immediately on git merge conflict (default, safest).
+# "theirs" - Automatically choose the upstream (incoming) changes on conflict.
+# "ours"   - Automatically choose the local branch's changes on conflict.
+CONFLICT_STRATEGY="abort"

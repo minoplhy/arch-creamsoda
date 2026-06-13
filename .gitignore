@@ -1,0 +1,27 @@
+# Protect packages worktree directories (managed via worktrees)
+/packages/
+
+# Protect logs directory (compilation logs and diagnostics)
+/logs/
+
+# Protect GnuPG home directory
+/.gnupg/
+
+# Ignore local source cache and pacman package cache
+/cache/
+cache
+# Ignore custom/temporary chroot directories
+/chroot-ok/
+/chroot-*/
+
+# Output repository directory rules:
+# - Ignore package binary archives (large files)
+/repo/*.pkg.tar.*
+repo
+# - Ignore package GPG signatures (large/re-generated binaries)
+/repo/*.pkg.tar.*.sig
+# - Ignore repository lock file and build run status
+/repo/repo.lock
+/repo/status.json
+# - DO NOT ignore repository databases (*.db.tar.gz, *.files.tar.gz), allowing you 
+#   to track and commit them directly to GitHub/GitLab Pages for publishing.
