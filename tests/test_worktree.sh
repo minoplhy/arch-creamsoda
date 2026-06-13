@@ -112,6 +112,31 @@ run_worktree_tests() {
   assert_failure "${script_path} sync \"${bare_repo}\" \"non-existent-branch\" \"${SANDBOX_DIR}/wt-fail\"" "Syncing non-existent branch fails"
 
 
+  # Test Case 3b: Update bare repository database (standalone)
+  log_info "TEST: Update bare repository database (standalone)..."
+  # Add a new branch to the upstream remote
+  (
+    cd "$upstream_dir" || exit 1
+    git checkout -b new-branch-for-update --quiet
+    echo "Update test" > update-test.txt
+    git add update-test.txt
+    git commit -m "added update-test branch" --quiet
+    git checkout master --quiet 2>/dev/null || git checkout main --quiet
+  )
+  
+  # Run update
+  assert_success "${script_path} update \"${bare_repo}\"" "Bare repository update command"
+  
+  # Verify that the new branch reference is fetched and tracked
+  local refs_after_update
+  refs_after_update=$(git -C "$bare_repo" show-ref)
+  local has_new_branch=0
+  if echo "$refs_after_update" | grep -q "refs/remotes/origin/new-branch-for-update"; then
+    has_new_branch=1
+  fi
+  assert_equals "1" "$has_new_branch" "Bare repository has fetched the new remote branch reference"
+
+
   # Test Case 4: Sync/Update worktree after remote has new commits
   log_info "TEST: Sync updates worktree with new upstream commits..."
   # Add a new commit to mock upstream branch 'feature-test'

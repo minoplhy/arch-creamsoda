@@ -39,6 +39,9 @@ Commands:
     Clones <remote_url> as a bare repository into <bare_path> and configures 
     its fetch refspec to cleanly map remote branches under refs/remotes/origin/*
 
+  update <bare_path>
+    Updates the bare repository database by fetching references from remote origin.
+
   sync <bare_path> <branch_name> <worktree_path>
     Fetches the latest remote refs, updates or creates the local tracking branch 
     pointing to origin/<branch_name> (Option B for observability), and checks 
@@ -211,6 +214,28 @@ cmd_cleanup() {
   log_success "Cleanup completed."
 }
 
+cmd_update() {
+  local bare_path="$1"
+
+  if [ -z "$bare_path" ]; then
+    log_error "Missing required arguments for update."
+    echo "Usage: $0 update <bare_path>"
+    exit 1
+  fi
+
+  local abs_bare_path
+  abs_bare_path=$(cd "$bare_path" && pwd)
+
+  if [ ! -d "$abs_bare_path" ] || ! git -C "$abs_bare_path" rev-parse --is-bare-repository &>/dev/null; then
+    log_error "Invalid bare repository path: ${bare_path}"
+    exit 1
+  fi
+
+  log_info "Updating bare repository database (fetching from origin)..."
+  git -C "$abs_bare_path" fetch origin --prune
+  log_success "Bare repository database updated successfully."
+}
+
 # Command Router
 cmd="${1:-}"
 case "$cmd" in
@@ -221,6 +246,10 @@ case "$cmd" in
   sync)
     shift
     cmd_sync "$@"
+    ;;
+  update)
+    shift
+    cmd_update "$@"
     ;;
   cleanup)
     shift
