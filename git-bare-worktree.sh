@@ -139,30 +139,43 @@ cmd_sync() {
     exit 1
   fi
 
-  # Clean up any existing worktree at the target path
-  # We check both git worktree list and folder existence to be robust
-  if git -C "$abs_bare_path" worktree list | grep -F " ${abs_worktree_path} " >/dev/null 2>&1 || [ -d "$abs_worktree_path" ]; then
-    log_warn "Existing worktree or directory detected at ${abs_worktree_path}. Cleaning up first..."
-    git -C "$abs_bare_path" worktree remove --force "$abs_worktree_path" 2>/dev/null || true
-    rm -rf "$abs_worktree_path"
-    git -C "$abs_bare_path" worktree prune
+  # Check if the worktree is already registered
+  local is_registered=0
+  if git -C "$abs_bare_path" worktree list | grep -F "${abs_worktree_path} " >/dev/null 2>&1; then
+    is_registered=1
   fi
 
-  # Ensure the local branch is aligned to track the remote branch (Option B for Observability)
-  log_info "Resetting/creating local tracking branch '${branch_name}' to track 'origin/${branch_name}'..."
-  # Force point/create the local branch to the remote tracking branch
-  git -C "$abs_bare_path" branch -f "$branch_name" "origin/$branch_name"
-  # Set upstream tracking so observability tools (git status, git branch -vv) see it correctly
-  git -C "$abs_bare_path" branch --set-upstream-to="origin/$branch_name" "$branch_name" >/dev/null 2>&1 || true
+  if [ $is_registered -eq 1 ]; then
+    log_info "Worktree already registered at ${abs_worktree_path}. Updating in-place..."
+    # Reset the worktree files directly to match origin/<branch_name>
+    # (Allowed on checked out branch directly in worktree, avoids Git branch lock conflicts)
+    git -C "$abs_worktree_path" reset --hard "refs/remotes/origin/$branch_name" --quiet
+    
+    # Removed git clean -fdx to natively protect untracked assets (repo, logs, cache, packages) and only reset tracked files.
 
-  # Add the worktree
-  log_info "Creating worktree at ${abs_worktree_path} on branch '${branch_name}'..."
-  git -C "$abs_bare_path" worktree add "$abs_worktree_path" "$branch_name"
+    # Initialize and update submodules if .gitmodules exists
+    if [ -f "${abs_worktree_path}/.gitmodules" ]; then
+      log_info "Submodules configuration (.gitmodules) detected. Updating submodules..."
+      git -C "$abs_worktree_path" submodule update --init --recursive
+    fi
+  else
+    # Ensure the local branch is aligned to track the remote branch (Option B for Observability)
+    # (Safe because the branch is not checked out yet)
+    log_info "Resetting/creating local tracking branch '${branch_name}' to track 'origin/${branch_name}'..."
+    git -C "$abs_bare_path" branch -f "$branch_name" "refs/remotes/origin/$branch_name"
+    git -C "$abs_bare_path" branch --set-upstream-to="origin/$branch_name" "$branch_name" >/dev/null 2>&1 || true
 
-  # Initialize and update submodules if .gitmodules exists
-  if [ -f "${abs_worktree_path}/.gitmodules" ]; then
-    log_info "Submodules configuration (.gitmodules) detected. Initializing and updating submodules..."
-    git -C "$abs_worktree_path" submodule update --init --recursive
+    # Untracked files and pre-existing directories (.bare, packages) will be natively ignored/preserved by git worktree add --force.
+
+    # Add the worktree
+    log_info "Creating worktree at ${abs_worktree_path} on branch '${branch_name}'..."
+    git -C "$abs_bare_path" worktree add --force "$abs_worktree_path" "$branch_name"
+
+    # Initialize submodules
+    if [ -f "${abs_worktree_path}/.gitmodules" ]; then
+      log_info "Submodules configuration (.gitmodules) detected. Initializing submodules..."
+      git -C "$abs_worktree_path" submodule update --init --recursive
+    fi
   fi
 
   # Print branch tracking info for observability verification

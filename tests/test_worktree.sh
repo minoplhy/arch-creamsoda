@@ -177,7 +177,7 @@ run_worktree_tests() {
     has_dirty=1
   fi
   assert_equals "0" "$has_dirty" "Dirty local modifications are cleaned up"
-  assert_file_not_exists "${worktree_dir}/build_output.log" "Untracked files are removed"
+  assert_file_exists "${worktree_dir}/build_output.log" "Untracked files are safely preserved"
 
 
   # Test Case 5b: Sync all packages (sync-packages)

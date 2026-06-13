@@ -203,11 +203,11 @@ chmod +x git-bare-worktree.sh
 # 2. Setup the bare database clone inside the workspace under .bare/
 ./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/workspace/.bare"
 
-# 3. Sync all package branches into worktrees under packages/
-./git-bare-worktree.sh sync-packages "/var/lib/builds/workspace/.bare" "/var/lib/builds/workspace/packages"
-
-# 4. Sync the master build workspace branch to the workspace root
+# 3. Sync the master build workspace branch to the workspace root
 ./git-bare-worktree.sh sync "/var/lib/builds/workspace/.bare" "master" "/var/lib/builds/workspace"
+
+# 4. Sync all package branches into worktrees under packages/
+./git-bare-worktree.sh sync-packages "/var/lib/builds/workspace/.bare" "/var/lib/builds/workspace/packages"
 
 # 5. Run the builder to compile outstanding package updates
 cd "/var/lib/builds/workspace"
