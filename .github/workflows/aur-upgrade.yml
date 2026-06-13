@@ -1,11 +1,15 @@
 name: Scheduled Package Upgrade Checks
 
+# NOTE: This is a template workflow. It should be moved/copied to the parent
+# package repository where the actual package branches are hosted.
+# Automatic cron is disabled by default to prevent runs on the engine repository.
+
 on:
-  schedule:
-    # Run daily at midnight
-    - cron: '0 0 * * *'
+  # schedule:
+  #   # Run daily at midnight
+  #   - cron: '0 0 * * *'
+  # Allow manual execution for testing purposes in the engine repo
   workflow_dispatch:
-    # Allow manual execution via GitHub UI
 
 permissions:
   contents: write
@@ -14,7 +18,13 @@ permissions:
 jobs:
   check-upgrades:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     steps:
+      - name: Install System Dependencies
+        run: |
+          pacman -Syu --noconfirm git jq curl base-devel sudo
+
       - name: Checkout Repository with Full History
         uses: actions/checkout@v4
         with:
@@ -22,42 +32,48 @@ jobs:
 
       - name: Configure Git Credentials
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Install pacman utilities (vercmp / makepkg mock dependencies)
+      - name: Setup Non-Root Builder User for Makepkg
         run: |
-          sudo apt-get update
-          # Install basic compilation prerequisites and jq
-          sudo apt-get install -y jq curl git
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+          chown -R builder:builder "$GITHUB_WORKSPACE"
 
       - name: Scan and Upgrade Packages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get all local branch names tracking package streams
-          branches=$(git for-each-ref --format='%(refname:short)' refs/heads/)
-          
-          for branch in $branches; do
-            # Skip master, main and temporary upgrade branches
-            if [ "$branch" = "master" ] || [ "$branch" = "main" ] || [[ "$branch" =~ ^upgrade/ ]]; then
-              continue
-            fi
+          # Run the scanning and upgrading loop as the builder user so makepkg succeeds
+          sudo -u builder -i sh -c "
+            cd \"$GITHUB_WORKSPACE\"
             
-            echo "================================================================================"
-            echo "Processing upgrade check for package: $branch"
-            echo "================================================================================"
+            # Get all local branch names tracking package streams
+            branches=\$(git for-each-ref --format='%(refname:short)' refs/heads/)
             
-            # Check version status
-            ./manage.sh version-check "$branch"
-            check_status=$?
-            
-            if [ $check_status -eq 2 ]; then
-              # Status 2 indicates OUT-OF-DATE. Attempt to run upgrade in PR mode.
-              echo "Package '$branch' is out-of-date. Opening PR..."
-              ./manage.sh upgrade "$branch" --pr || echo "Failed to create PR upgrade for '$branch'."
-            else
-              echo "Package '$branch' does not require updates (status code: $check_status)."
-            fi
-            echo ""
-          done
+            for branch in \$branches; do
+              # Skip master, main and temporary upgrade branches
+              if [ \"\$branch\" = \"master\" ] || [ \"\$branch\" = \"main\" ] || [[ \"\$branch\" =~ ^upgrade/ ]]; then
+                continue
+              fi
+              
+              echo \"================================================================================\"
+              echo \"Processing upgrade check for package: \$branch\"
+              echo \"================================================================================\"
+              
+              # Check version status
+              ./manage.sh version-check \"\$branch\"
+              check_status=\$?
+              
+              if [ \$check_status -eq 2 ]; then
+                # Status 2 indicates OUT-OF-DATE. Attempt to run upgrade in PR mode.
+                echo \"Package '\$branch' is out-of-date. Opening PR...\"
+                ./manage.sh upgrade \"\$branch\" --pr || echo \"Failed to create PR upgrade for '\$branch'.\"
+              else
+                echo \"Package '\$branch' does not require updates (status code: \$check_status).\"
+              fi
+              echo \"\"
+            done
+          "

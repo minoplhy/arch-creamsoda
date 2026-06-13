@@ -1,7 +1,13 @@
 # Shared core utilities for Arch Repository System
 
 # Resolve workspace root directory
-WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [ -z "$WORKSPACE_DIR" ]; then
+  if [ -f "./config.conf" ]; then
+    WORKSPACE_DIR="$(pwd)"
+  else
+    WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+  fi
+fi
 export WORKSPACE_DIR
 
 # Define log levels with colors
