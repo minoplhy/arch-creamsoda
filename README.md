@@ -91,6 +91,20 @@ mkarchroot cache/chroot/root base-devel
 ```
 *(If `CHROOT_DIR` is left empty, the system defaults to the pre-configured system-wide chroot path `/var/lib/archbuild/extra-x86_64/`).*
 
+### 5. Running on Non-Arch Hosts via Docker (Alpine Linux, etc.)
+If your build server runs on a non-Arch host OS (like Alpine Linux), you cannot execute `devtools` or systemd namespaces directly. Instead, run the build server inside a privileged Arch Linux Docker container that matches your host user's UID and GID:
+
+1. **Start the build container** using the automated script:
+   ```bash
+   ./arch-creamsoda/docker-run.sh
+   ```
+   *This automatically builds the container matching your host UID/GID, mounts the workspace, and maps the Pacman package cache directory.*
+2. **Configure caching in `config.conf`** to persist the clean chroot base system to the host filesystem:
+   ```ini
+   CHROOT_DIR="cache/chroot"
+   ```
+   By saving the chroot base inside the workspace, it persists permanently across container restarts.
+
 ---
 
 ## Command Reference
