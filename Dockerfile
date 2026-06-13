@@ -16,9 +16,13 @@ ARG USERNAME=builder
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm base-devel devtools git sudo rsync
 
-# Create a build group and user matching the host IDs
-RUN groupadd -g "${GID}" "${USERNAME}" && \
-    useradd -m -u "${UID}" -g "${GID}" -s /bin/bash "${USERNAME}" && \
+# Create a build group and user matching the host IDs (fallback to 1000 if host is root)
+RUN ACTUAL_UID="${UID}"; \
+    ACTUAL_GID="${GID}"; \
+    if [ "${UID}" -eq 0 ]; then ACTUAL_UID=1000; fi; \
+    if [ "${GID}" -eq 0 ]; then ACTUAL_GID=1000; fi; \
+    (groupadd -g "${ACTUAL_GID}" "${USERNAME}" 2>/dev/null || groupadd "${USERNAME}") && \
+    (useradd -m -u "${ACTUAL_UID}" -g "${USERNAME}" -s /bin/bash "${USERNAME}" 2>/dev/null || useradd -m -g "${USERNAME}" -s /bin/bash "${USERNAME}") && \
     echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${USERNAME}" && \
     chmod 0440 "/etc/sudoers.d/${USERNAME}"
 
