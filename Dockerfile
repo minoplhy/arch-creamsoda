@@ -16,6 +16,10 @@ ARG USERNAME=builder
 RUN pacman -Syu --noconfirm && \
     pacman -S --noconfirm base-devel devtools git sudo rsync
 
+# Configure Git system-wide to trust all directories (safe.directory)
+# This avoids "dubious ownership" errors when mounting workspaces or running via sudo
+RUN git config --system safe.directory '*'
+
 # Create a build group and user matching the host IDs (fallback to 1000 if host is root)
 RUN ACTUAL_UID="${UID}"; \
     ACTUAL_GID="${GID}"; \
