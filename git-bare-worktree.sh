@@ -165,12 +165,11 @@ cmd_sync() {
     git -C "$abs_bare_path" branch -f "$branch_name" "refs/remotes/origin/$branch_name"
     git -C "$abs_bare_path" branch --set-upstream-to="origin/$branch_name" "$branch_name" >/dev/null 2>&1 || true
 
-    # Untracked files and pre-existing directories (.bare, packages) will be natively ignored/preserved by git worktree add --force.
-
+    # Untracked files and pre-existing directories (.bare, packages) will be natively ignored/preserved.
     # Add the worktree
     log_info "Creating worktree at ${abs_worktree_path} on branch '${branch_name}'..."
     git -C "$abs_bare_path" worktree add --force "$abs_worktree_path" "$branch_name"
-
+    
     # Initialize submodules
     if [ -f "${abs_worktree_path}/.gitmodules" ]; then
       log_info "Submodules configuration (.gitmodules) detected. Initializing submodules..."

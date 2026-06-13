@@ -65,6 +65,7 @@ load_config() {
   export CACHE_PACMAN_PACKAGES="${CACHE_PACMAN_PACKAGES:-true}"
   export PACMAN_CACHE_DIR="${PACMAN_CACHE_DIR:-cache/packages}"
   export PUBLISH_DEST="${PUBLISH_DEST:-}"
+  export GIT_BARE_DIR="${GIT_BARE_DIR:-}"
 
   # Make paths absolute if they are relative
   [[ "$REPO_DIR" = /* ]] || REPO_DIR="${WORKSPACE_DIR}/${REPO_DIR}"
@@ -76,6 +77,9 @@ load_config() {
   if [ -n "$CHROOT_DIR" ]; then
     [[ "$CHROOT_DIR" = /* ]] || CHROOT_DIR="${WORKSPACE_DIR}/${CHROOT_DIR}"
   fi
+  if [ -n "$GIT_BARE_DIR" ]; then
+    [[ "$GIT_BARE_DIR" = /* ]] || GIT_BARE_DIR="${WORKSPACE_DIR}/${GIT_BARE_DIR}"
+  fi
 
   export REPO_DIR
   export PACKAGES_DIR
@@ -84,6 +88,7 @@ load_config() {
   export SOURCE_CACHE_DIR
   export CHROOT_DIR
   export PACMAN_CACHE_DIR
+  export GIT_BARE_DIR
 }
 
 # Verify and create necessary directory structure

@@ -94,16 +94,25 @@ mkarchroot cache/chroot/root base-devel
 ### 5. Running on Non-Arch Hosts via Docker (Alpine Linux, etc.)
 If your build server runs on a non-Arch host OS (like Alpine Linux), you cannot execute `devtools` or systemd namespaces directly. Instead, run the build server inside a privileged Arch Linux Docker container that matches your host user's UID and GID:
 
-1. **Start the build container** using the automated script:
-   ```bash
-   ./arch-creamsoda/docker-run.sh
-   ```
-   *This automatically builds the container matching your host UID/GID, mounts the workspace, and maps the Pacman package cache directory.*
-2. **Configure caching in `config.conf`** to persist the clean chroot base system to the host filesystem:
-   ```ini
-   CHROOT_DIR="cache/chroot"
-   ```
-   By saving the chroot base inside the workspace, it persists permanently across container restarts.
+* **Start the build container** using the automated runner script:
+  ```bash
+  ./arch-creamsoda/docker-run.sh
+  ```
+  *This automatically builds the container matching your host UID/GID, mounts the workspace, and maps the Pacman package cache directory.*
+
+* **Passing the Bare Git Repository:**
+  If the bare repository resides outside your workspace, the runner will attempt to auto-detect its path. If you want to specify it explicitly, set the `GIT_BARE_DIR` environment variable or define it in your `config.conf`:
+  ```bash
+  # Start Docker container passing an explicit bare Git repository path
+  GIT_BARE_DIR="/var/lib/builds/repo.git" ./arch-creamsoda/docker-run.sh
+  ```
+
+* **Configure Caching in `config.conf`:**
+  To persist the clean chroot base system to the host filesystem:
+  ```ini
+  CHROOT_DIR="cache/chroot"
+  ```
+  By saving the chroot base inside the workspace, it persists permanently across container restarts.
 
 ---
 
@@ -193,21 +202,21 @@ A self-contained helper script designed to configure and manage git worktrees fr
 
 ### CI/CD Server Usage Example (Via Curl)
 
-This script is fully standalone and can be curled directly onto any remote build server or runner. It is recommended to clone the bare repository inside a hidden `.bare/` folder in your workspace root to keep the environment self-contained:
+This script is fully standalone and can be curled directly onto any remote build server or runner. It is recommended to clone the bare repository completely OUTSIDE your target workspace folder so that Git can seamlessly initialize the workspace directory from scratch:
 
 ```bash
 # 1. Download and make executable
 curl -sSL -o git-bare-worktree.sh https://raw.githubusercontent.com/username/repo/main/git-bare-worktree.sh
 chmod +x git-bare-worktree.sh
 
-# 2. Setup the bare database clone inside the workspace under .bare/
-./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/workspace/.bare"
+# 2. Setup the bare database clone OUTSIDE the workspace directory
+./git-bare-worktree.sh setup "git@github.com:username/repo.git" "/var/lib/builds/repo.git"
 
-# 3. Sync the master build workspace branch to the workspace root
-./git-bare-worktree.sh sync "/var/lib/builds/workspace/.bare" "master" "/var/lib/builds/workspace"
+# 3. Sync the master build workspace branch to an empty directory
+./git-bare-worktree.sh sync "/var/lib/builds/repo.git" "master" "/var/lib/builds/workspace"
 
 # 4. Sync all package branches into worktrees under packages/
-./git-bare-worktree.sh sync-packages "/var/lib/builds/workspace/.bare" "/var/lib/builds/workspace/packages"
+./git-bare-worktree.sh sync-packages "/var/lib/builds/repo.git" "/var/lib/builds/workspace/packages"
 
 # 5. Run the builder to compile outstanding package updates
 cd "/var/lib/builds/workspace"

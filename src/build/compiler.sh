@@ -63,6 +63,21 @@ compile_and_register() {
       fi
 
       if [ "$BUILD_METHOD" = "chroot" ]; then
+        # Validate chroot to auto-recover from interrupted/corrupted builds
+        local active_chroot_dir="/var/lib/archbuild"
+        if [ -n "$CHROOT_DIR" ]; then
+          active_chroot_dir="$CHROOT_DIR"
+        fi
+        
+        local chroot_root_path="${active_chroot_dir}/extra-x86_64/root"
+        if [ -d "${active_chroot_dir}/extra-x86_64" ] && [ ! -f "${chroot_root_path}/.arch-chroot" ]; then
+          log_warning "Corrupted or incomplete chroot detected at ${chroot_root_path}."
+          log_warning "Cleaning up corrupted chroot directory to force a clean re-initialization..."
+          log_warning "Corrupted or incomplete chroot detected at ${chroot_root_path}. Cleaning up..." >> "$log_file" 2>&1
+          # Clean up using sudo since chroot files are owned by root
+          sudo rm -rf "${active_chroot_dir}/extra-x86_64" >> "$log_file" 2>&1 || true
+        fi
+
         log_info "Compiling in clean chroot using extra-x86_64-build..." >> "$log_file" 2>&1
         
         local chroot_opts=()

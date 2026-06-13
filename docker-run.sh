@@ -29,15 +29,35 @@ docker build \
 # Resolve the Git common directory (bare repository base database)
 # When working with git worktrees, the actual .git files and databases are inside the bare repository
 # which might lie outside of the active worktree workspace path. We must mount it as well.
-GIT_BARE_DIR=""
-if git -C "${WORKSPACE_DIR}" rev-parse --git-dir &>/dev/null; then
-  COMMON_DIR=$(git -C "${WORKSPACE_DIR}" rev-parse --git-common-dir)
-  # Resolve to absolute path safely
-  GIT_BARE_DIR="$(cd "${WORKSPACE_DIR}" && cd "${COMMON_DIR}" && pwd)"
+# Respect GIT_BARE_DIR if already set in environment
+GIT_BARE_DIR="${GIT_BARE_DIR:-}"
+
+# If not in env, check if it's set in config.conf
+if [ -z "${GIT_BARE_DIR}" ] && [ -f "${WORKSPACE_DIR}/config.conf" ]; then
+  # Sourcing in a subshell to avoid polluting environment
+  GIT_BARE_DIR=$(unset GIT_BARE_DIR; source "${WORKSPACE_DIR}/config.conf" &>/dev/null && echo "${GIT_BARE_DIR:-}")
+fi
+
+# If still not found, attempt auto-detection from git worktree
+if [ -z "${GIT_BARE_DIR}" ]; then
+  if git -C "${WORKSPACE_DIR}" rev-parse --git-dir &>/dev/null; then
+    COMMON_DIR=$(git -C "${WORKSPACE_DIR}" rev-parse --git-common-dir)
+    # Resolve to absolute path safely
+    GIT_BARE_DIR="$(cd "${WORKSPACE_DIR}" && cd "${COMMON_DIR}" && pwd)"
+  fi
+fi
+
+# Ensure GIT_BARE_DIR is absolute and exists if it is set
+if [ -n "${GIT_BARE_DIR}" ]; then
+  if [[ "${GIT_BARE_DIR}" != /* ]]; then
+    GIT_BARE_DIR="${WORKSPACE_DIR}/${GIT_BARE_DIR}"
+  fi
+  mkdir -p "${GIT_BARE_DIR}"
+  GIT_BARE_DIR="$(cd "${GIT_BARE_DIR}" && pwd)"
 fi
 
 EXTRA_MOUNTS=()
-if [ -n "${GIT_BARE_DIR}" ] && [[ "${GIT_BARE_DIR}" != "${WORKSPACE_DIR}"* ]]; then
+if [ -n "${GIT_BARE_DIR}" ] && [ "${GIT_BARE_DIR}" != "${WORKSPACE_DIR}" ] && [[ "${GIT_BARE_DIR}" != "${WORKSPACE_DIR}/"* ]]; then
   echo "Detected external bare Git directory at: ${GIT_BARE_DIR}"
   echo "Mounting Git directory to preserve worktree metadata..."
   EXTRA_MOUNTS+=("-v" "${GIT_BARE_DIR}:${GIT_BARE_DIR}")
@@ -57,5 +77,6 @@ docker run --privileged -it --rm \
   -w "${WORKSPACE_DIR}" \
   -v "${WORKSPACE_DIR}/cache/packages:/var/cache/pacman/pkg" \
   "${EXTRA_MOUNTS[@]}" \
+  -e GIT_BARE_DIR="${GIT_BARE_DIR}" \
   --name "${CONTAINER_NAME}" \
   "${IMAGE_NAME}"
