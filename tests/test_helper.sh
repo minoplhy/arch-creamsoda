@@ -213,6 +213,36 @@ else
 fi
 EOF
   chmod +x "${MOCKS_DIR}/gpg"
+
+  # 6. Mock stat
+  local real_stat
+  real_stat=$(which stat 2>/dev/null || command -v stat 2>/dev/null)
+  if [ -n "$real_stat" ] && [ "$real_stat" != "${MOCKS_DIR}/stat" ]; then
+    real_stat=$(readlink -f "$real_stat" 2>/dev/null || echo "$real_stat")
+  else
+    real_stat=""
+  fi
+
+  cat <<EOF > "${MOCKS_DIR}/stat"
+#!/usr/bin/env bash
+if [[ "\$*" =~ "mock_gpg_home" ]] && [[ "\$*" =~ "%u" ]]; then
+  echo "9999"
+  exit 0
+fi
+if [ -n "${real_stat}" ] && [ -x "${real_stat}" ]; then
+  exec "${real_stat}" "\$@"
+else
+  exit 0
+fi
+EOF
+  chmod +x "${MOCKS_DIR}/stat"
+
+  # 7. Mock sudo
+  cat <<'EOF' > "${MOCKS_DIR}/sudo"
+#!/usr/bin/env bash
+exec "$@"
+EOF
+  chmod +x "${MOCKS_DIR}/sudo"
 }
 
 # Assertion Utilities

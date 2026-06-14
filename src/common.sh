@@ -107,6 +107,17 @@ init_dirs() {
   if [ -n "$GNUPGHOME" ]; then
     mkdir -p "$GNUPGHOME"
     chmod 700 "$GNUPGHOME"
+    # Ensure correct ownership of the GPG directory to prevent GnuPG failures due to host/container mismatches
+    if [ -d "$GNUPGHOME" ]; then
+      local owner_uid
+      owner_uid=$(stat -c '%u' "$GNUPGHOME" 2>/dev/null || true)
+      if [ -n "$owner_uid" ] && [ "$owner_uid" -ne "$(id -u)" ]; then
+        log_warning "GPG directory '${GNUPGHOME}' is owned by UID ${owner_uid}, but current user has UID $(id -u)."
+        log_warning "This ownership mismatch will cause GnuPG key verification to fail."
+        log_warning "Please run the following command on your host to fix it:"
+        log_warning "  sudo chown -R \$(id -u):\$(id -g) \"$GNUPGHOME\""
+      fi
+    fi
   fi
   if [ "$CACHE_SOURCES" = "true" ]; then
     mkdir -p "$SOURCE_CACHE_DIR"

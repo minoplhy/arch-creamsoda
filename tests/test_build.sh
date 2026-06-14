@@ -177,6 +177,19 @@ run_build_tests() {
   assert_success "[ \"\$(stat -c %a cache/sources)\" = \"777\" ]" "cache/sources directory is globally writable (777)"
   assert_success "[ \"\$(stat -c %a cache/packages)\" = \"777\" ]" "cache/packages directory is globally writable (777)"
   
+  # Test Case 10: GPG directory ownership mismatch check
+  log_info "TEST: GPG directory ownership mismatch check..."
+  local original_gnupg="$GNUPGHOME"
+  export GNUPGHOME="mock_gpg_home"
+  (
+    source src/common.sh
+    init_dirs
+  ) > gpg_ownership_test.txt 2>&1
+  assert_success "grep -q 'mismatch' gpg_ownership_test.txt" "Ownership mismatch warning printed"
+  assert_success "grep -q 'chown' gpg_ownership_test.txt" "Ownership correction instruction printed"
+  rm -rf mock_gpg_home gpg_ownership_test.txt
+  export GNUPGHOME="$original_gnupg"
+
   # Cleanup
   ./manage.sh delete pgp-pkg >/dev/null
   rm -f gpg_imports.log build_gpg_warn.txt build_gpg_clean.txt
