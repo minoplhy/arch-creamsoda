@@ -11,6 +11,23 @@ compile_and_register() {
     return 0
   fi
 
+  # Resolve cache directories to absolute paths (relative to workspace root) before entering package loop/subshell
+  local abs_source_cache_dir=""
+  if [ -n "${SOURCE_CACHE_DIR:-}" ]; then
+    mkdir -p "$SOURCE_CACHE_DIR"
+    abs_source_cache_dir=$(cd "$SOURCE_CACHE_DIR" && pwd)
+    chmod 777 "$abs_source_cache_dir" 2>/dev/null || true
+  fi
+
+  local abs_pacman_cache_dir=""
+  if [ -n "${PACMAN_CACHE_DIR:-}" ]; then
+    mkdir -p "$PACMAN_CACHE_DIR"
+    abs_pacman_cache_dir=$(cd "$PACMAN_CACHE_DIR" && pwd)
+    chmod 777 "$abs_pacman_cache_dir" 2>/dev/null || true
+  fi
+
+
+
   log_info "Starting compilation queue of ${#BUILD_QUEUE[@]} packages..."
   
   local success_count=0
@@ -58,8 +75,10 @@ compile_and_register() {
         fi
       fi
 
-      if [ "$CACHE_SOURCES" = "true" ]; then
-        export SRCDEST="$SOURCE_CACHE_DIR"
+
+
+      if [ "$CACHE_SOURCES" = "true" ] && [ -n "$abs_source_cache_dir" ]; then
+        export SRCDEST="$abs_source_cache_dir"
       fi
 
       if [ "$BUILD_METHOD" = "chroot" ]; then
@@ -118,8 +137,8 @@ compile_and_register() {
         fi
         
         local makechrootpkg_opts=()
-        if [ "$CACHE_PACMAN_PACKAGES" = "true" ]; then
-          makechrootpkg_opts+=("-d" "${PACMAN_CACHE_DIR}:/var/cache/pacman/pkg")
+        if [ "$CACHE_PACMAN_PACKAGES" = "true" ] && [ -n "$abs_pacman_cache_dir" ]; then
+          makechrootpkg_opts+=("-d" "${abs_pacman_cache_dir}:/var/cache/pacman/pkg")
         fi
 
         # Extract dependencies from PKGBUILD to only install required local dependencies

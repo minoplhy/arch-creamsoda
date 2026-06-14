@@ -164,6 +164,11 @@ run_build_tests() {
   # Verify custom GNUPGHOME directory exists and has 700 permissions
   assert_success "[ -d .gnupg ]" "Custom GNUPGHOME directory created"
   assert_success "[ \"\$(stat -c %a .gnupg)\" = \"700\" ]" "Custom GNUPGHOME has correct 700 permissions"
+
+  # Test Case 9: Verify globally writable cache directories permissions
+  log_info "TEST: Verify cache directories permissions..."
+  assert_success "[ \"\$(stat -c %a cache/sources)\" = \"777\" ]" "cache/sources directory is globally writable (777)"
+  assert_success "[ \"\$(stat -c %a cache/packages)\" = \"777\" ]" "cache/packages directory is globally writable (777)"
   
   # Cleanup
   ./manage.sh delete pgp-pkg >/dev/null

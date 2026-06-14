@@ -14,7 +14,7 @@ ARG USERNAME=builder
 # - sudo: Required for chroot build commands (systemd-nspawn)
 # - rsync: Needed for publishing repository files
 RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm base-devel devtools git sudo rsync
+    pacman -S --noconfirm base-devel devtools git sudo rsync less
 
 # Configure Git system-wide to trust all directories (safe.directory)
 # This avoids "dubious ownership" errors when mounting workspaces or running via sudo
@@ -30,9 +30,14 @@ RUN ACTUAL_UID="${UID}"; \
     echo "${USERNAME} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/${USERNAME}" && \
     chmod 0440 "/etc/sudoers.d/${USERNAME}"
 
-# Pre-configure the base directory for devtools chroots
-RUN mkdir -p /var/lib/archbuild && \
-    chown -R "${USERNAME}:${USERNAME}" /var/lib/archbuild
+# Pre-configure the base directory for devtools chroots and package cache
+RUN mkdir -p /var/lib/archbuild /var/cache/sources && \
+    chown -R "${USERNAME}:${USERNAME}" /var/lib/archbuild /var/cache/sources && \
+    chmod 777 /var/cache/sources && \
+    sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /etc/makepkg.conf && \
+    if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then \
+        sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /usr/share/devtools/makepkg-x86_64.conf; \
+    fi
 
 # Install secure wrapper for systemd-nspawn to disable D-Bus/systemd registration when running inside Docker
 RUN printf '#!/bin/bash\nexec /usr/bin/systemd-nspawn --register=no --keep-unit "$@"\n' > /usr/local/bin/systemd-nspawn && \

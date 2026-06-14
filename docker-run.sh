@@ -13,10 +13,25 @@ WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 IMAGE_NAME="arch-build-server"
 CONTAINER_NAME="arch-builder"
 
-# Ensure cache directories exist on the host before running Docker to avoid them being created as root
-mkdir -p "${WORKSPACE_DIR}/cache/packages"
-mkdir -p "${WORKSPACE_DIR}/cache/sources"
-mkdir -p "${WORKSPACE_DIR}/cache/chroot"
+# Load values from config.conf if it exists
+if [ -f "${WORKSPACE_DIR}/config.conf" ]; then
+  # Extract cache settings safely from the config file
+  eval "$(grep -E '^(SOURCE_CACHE_DIR|PACMAN_CACHE_DIR|CHROOT_DIR)=' "${WORKSPACE_DIR}/config.conf")"
+fi
+
+# Fallback defaults
+SOURCE_CACHE_DIR="${SOURCE_CACHE_DIR:-cache/sources}"
+PACMAN_CACHE_DIR="${PACMAN_CACHE_DIR:-cache/packages}"
+CHROOT_DIR="${CHROOT_DIR:-cache/chroot}"
+
+# Resolve relative paths to absolute paths under WORKSPACE_DIR
+[[ "$SOURCE_CACHE_DIR" = /* ]] || SOURCE_CACHE_DIR="${WORKSPACE_DIR}/${SOURCE_CACHE_DIR}"
+[[ "$PACMAN_CACHE_DIR" = /* ]] || PACMAN_CACHE_DIR="${WORKSPACE_DIR}/${PACMAN_CACHE_DIR}"
+[[ "$CHROOT_DIR" = /* ]] || CHROOT_DIR="${WORKSPACE_DIR}/${CHROOT_DIR}"
+
+# Ensure cache directories exist on the host and have correct permissions
+mkdir -p "$SOURCE_CACHE_DIR" "$PACMAN_CACHE_DIR" "$CHROOT_DIR"
+chmod 777 "$SOURCE_CACHE_DIR" "$PACMAN_CACHE_DIR" "$CHROOT_DIR"
 
 # Build the docker image matching the current host user's UID and GID
 echo "Building docker image '${IMAGE_NAME}' matching host user UID=$(id -u) GID=$(id -g)..."
@@ -63,6 +78,12 @@ if [ -n "${GIT_BARE_DIR}" ] && [ "${GIT_BARE_DIR}" != "${WORKSPACE_DIR}" ] && [[
   EXTRA_MOUNTS+=("-v" "${GIT_BARE_DIR}:${GIT_BARE_DIR}")
 fi
 
+if [ -n "${CHROOT_DIR}" ] && [ "${CHROOT_DIR}" != "${WORKSPACE_DIR}" ] && [[ "${CHROOT_DIR}" != "${WORKSPACE_DIR}/"* ]]; then
+  echo "Detected external chroot directory at: ${CHROOT_DIR}"
+  echo "Mounting chroot directory..."
+  EXTRA_MOUNTS+=("-v" "${CHROOT_DIR}:${CHROOT_DIR}")
+fi
+
 echo "--------------------------------------------------------------------------------"
 echo "Starting container '${CONTAINER_NAME}' in privileged mode..."
 echo "All files compiled will be owned by user '$(id -un)' ($(id -u):$(id -g))."
@@ -77,7 +98,8 @@ docker run --privileged -it --rm \
   --tmpfs /tmp \
   -v "${WORKSPACE_DIR}:${WORKSPACE_DIR}" \
   -w "${WORKSPACE_DIR}" \
-  -v "${WORKSPACE_DIR}/cache/packages:/var/cache/pacman/pkg" \
+  -v "${PACMAN_CACHE_DIR}:/var/cache/pacman/pkg" \
+  -v "${SOURCE_CACHE_DIR}:/var/cache/sources" \
   "${EXTRA_MOUNTS[@]}" \
   -e GIT_BARE_DIR="${GIT_BARE_DIR}" \
   --name "${CONTAINER_NAME}" \

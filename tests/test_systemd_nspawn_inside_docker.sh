@@ -85,6 +85,38 @@ if [ -f /etc/machine-id ]; then
   sudo cp /etc/machine-id "$TEST_DIR/etc/machine-id"
 fi
 
+# 4. Verify Docker cache configuration and permissions
+echo -e "\n4. Verifying Docker cache configuration and permissions..."
+if [ ! -d /var/cache/sources ]; then
+  echo -e "${RED}[ERROR]${NC} /var/cache/sources directory does not exist!"
+  exit 1
+fi
+
+sources_perms=$(stat -c '%a' /var/cache/sources)
+if [ "$sources_perms" != "777" ]; then
+  echo -e "${RED}[ERROR]${NC} /var/cache/sources permissions are ${sources_perms}, expected 777"
+  exit 1
+fi
+echo -e "${GREEN}[OK]${NC} /var/cache/sources directory is globally writable (777)"
+
+# Check etc makepkg.conf
+etc_srcdest=$(grep "^SRCDEST=" /etc/makepkg.conf | cut -d'"' -f2 || true)
+if [ "$etc_srcdest" != "/var/cache/sources" ]; then
+  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf SRCDEST is '${etc_srcdest}', expected '/var/cache/sources'"
+  exit 1
+fi
+echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf SRCDEST is correctly set to /var/cache/sources"
+
+# Check devtools makepkg.conf
+if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then
+  devtools_srcdest=$(grep "^SRCDEST=" /usr/share/devtools/makepkg-x86_64.conf | cut -d'"' -f2 || true)
+  if [ "$devtools_srcdest" != "/var/cache/sources" ]; then
+    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf SRCDEST is '${devtools_srcdest}', expected '/var/cache/sources'"
+    exit 1
+  fi
+  echo -e "${GREEN}[OK]${NC} /usr/share/devtools/makepkg-x86_64.conf SRCDEST is correctly set to /var/cache/sources"
+fi
+
 # Run a true command inside the container using systemd-nspawn
 # Note: we run under sudo and do NOT specify --register=no.
 # The wrapper in /usr/local/bin/systemd-nspawn must automatically intercept this
