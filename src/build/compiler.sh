@@ -75,8 +75,6 @@ compile_and_register() {
         fi
       fi
 
-
-
       if [ "$CACHE_SOURCES" = "true" ] && [ -n "$abs_source_cache_dir" ]; then
         export SRCDEST="$abs_source_cache_dir"
       fi

@@ -100,7 +100,7 @@ fi
 echo -e "${GREEN}[OK]${NC} /var/cache/sources directory is globally writable (777)"
 
 # Check etc makepkg.conf
-etc_srcdest=$(grep "^SRCDEST=" /etc/makepkg.conf | cut -d'"' -f2 || true)
+etc_srcdest=$(grep "^SRCDEST=" /etc/makepkg.conf | cut -d= -f2 | tr -d '"' || true)
 if [ "$etc_srcdest" != "/var/cache/sources" ]; then
   echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf SRCDEST is '${etc_srcdest}', expected '/var/cache/sources'"
   exit 1
@@ -109,7 +109,7 @@ echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf SRCDEST is correctly set to /var/ca
 
 # Check devtools makepkg.conf
 if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then
-  devtools_srcdest=$(grep "^SRCDEST=" /usr/share/devtools/makepkg-x86_64.conf | cut -d'"' -f2 || true)
+  devtools_srcdest=$(grep "^SRCDEST=" /usr/share/devtools/makepkg-x86_64.conf | cut -d= -f2 | tr -d '"' || true)
   if [ "$devtools_srcdest" != "/var/cache/sources" ]; then
     echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf SRCDEST is '${devtools_srcdest}', expected '/var/cache/sources'"
     exit 1
