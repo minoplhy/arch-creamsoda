@@ -43,14 +43,9 @@ run_build_tests() {
     has_gpg_flag=$(grep -c "\-d .*\.gnupg:/build/.gnupg" extra_x86_64_build_args.log)
     assert_success "[ \"$has_gpg_flag\" -gt 0 ]" "Clean chroot called with GPG keyring bind mount (-d)"
     
-    # Assert that devtools options (-d, -I) are not placed after the "--" separator
-    if grep -q " -- " extra_x86_64_build_args.log; then
-      local post_separator
-      post_separator=$(sed -E 's/.* -- (.*)/\1/' extra_x86_64_build_args.log)
-      local invalid_post_opts
-      invalid_post_opts=$(echo "$post_separator" | grep -c -E -- "\-(d|I)\b")
-      assert_equals "0" "$invalid_post_opts" "No devtools options (-d, -I) are placed after the double-dash separator"
-    fi
+    # Assert that devtools options (-d, -I) are placed after the first "--" separator in extra-x86_64-build
+    assert_success "grep -q -- \" -- .* \-d \" extra_x86_64_build_args.log" "GPG/pacman cache mounts passed after the -- separator"
+    assert_success "grep -q -- \" -- .* \-I \" extra_x86_64_build_args.log" "Local dependencies passed after the -- separator"
   fi
   rm -f extra_x86_64_build_args.log
 

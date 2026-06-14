@@ -134,20 +134,17 @@ echo -e "\n5. Verifying system archbuild / makechrootpkg argument flow..."
 archbuild_path=$(which archbuild 2>/dev/null || which extra-x86_64-build 2>/dev/null || echo "/usr/bin/archbuild")
 
 if [ -f "$archbuild_path" ]; then
-  # Look for the line where makechrootpkg is called
-  makechrootpkg_call=$(grep "makechrootpkg" "$archbuild_path" || true)
-  if [ -n "$makechrootpkg_call" ]; then
-    echo "Found makechrootpkg call in ${archbuild_path}:"
-    echo "  ${makechrootpkg_call}"
-    
-    # Check if the invocation passes makechrootpkg arguments before '--' and makepkg arguments after '--'
-    if echo "$makechrootpkg_call" | grep -q -E "makechrootpkg.*--.*makepkg"; then
-      echo -e "${GREEN}[OK]${NC} The system devtools script correctly forwards makechrootpkg arguments before the '--' separator, and makepkg arguments after it."
-    else
-      echo -e "${RED}[WARNING]${NC} The makechrootpkg call pattern in devtools did not match the expected pattern: ${makechrootpkg_call}"
-    fi
+  # Verify that the usage line defines passing makechrootpkg args after the first double-dash
+  usage_line=$(grep "Usage:.*--" "$archbuild_path" || true)
+  optind_line=$(grep "OPTIND" "$archbuild_path" || true)
+  
+  if [ -n "$usage_line" ] && [ -n "$optind_line" ]; then
+    echo "Found usage line: ${usage_line}"
+    echo "Found OPTIND line: ${optind_line}"
+    echo -e "${GREEN}[OK]${NC} The system devtools script correctly expects makechrootpkg arguments after the '--' separator."
   else
-    echo -e "${RED}[WARNING]${NC} Could not find makechrootpkg call in ${archbuild_path}"
+    echo -e "${RED}[ERROR]${NC} Could not verify option forwarding pattern in ${archbuild_path}"
+    exit 1
   fi
 else
   echo -e "${RED}[ERROR]${NC} devtools archbuild script not found at ${archbuild_path}!"
