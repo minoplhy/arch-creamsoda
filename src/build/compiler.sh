@@ -184,7 +184,7 @@ compile_and_register() {
           fi
         done
         
-        extra-x86_64-build "${chroot_opts[@]}" -- "${makechrootpkg_opts[@]}" >> "$log_file" 2>&1
+        extra-x86_64-build "${chroot_opts[@]}" "${makechrootpkg_opts[@]}" >> "$log_file" 2>&1
       else
         log_info "Compiling with makepkg..." >> "$log_file" 2>&1
         # makepkg -s (install dependencies), --noconfirm (non-interactive)
