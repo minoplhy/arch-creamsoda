@@ -103,5 +103,6 @@ docker run --privileged -it --rm \
   "${EXTRA_MOUNTS[@]}" \
   -e GIT_BARE_DIR="${GIT_BARE_DIR}" \
   -e WORKSPACE_DIR="${WORKSPACE_DIR}" \
+  -e GNUPGHOME="${WORKSPACE_DIR}/.gnupg" \
   --name "${CONTAINER_NAME}" \
   "${IMAGE_NAME}"

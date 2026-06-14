@@ -38,7 +38,8 @@ RUN mkdir -p /var/lib/archbuild /var/cache/sources && \
     echo 'if [ -f /.dockerenv ]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' >> /etc/makepkg.conf && \
     if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then \
         sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /usr/share/devtools/makepkg-x86_64.conf && \
-        echo 'if [ -f /.dockerenv ]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' >> /usr/share/devtools/makepkg-x86_64.conf; \
+        echo 'if [ -f /.dockerenv ]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' >> /usr/share/devtools/makepkg-x86_64.conf && \
+        echo 'if [ -d /build/.gnupg ]; then export GNUPGHOME="/build/.gnupg"; fi' >> /usr/share/devtools/makepkg-x86_64.conf; \
     fi
 
 # Install secure wrapper for systemd-nspawn to disable D-Bus/systemd registration when running inside Docker

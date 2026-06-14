@@ -38,6 +38,7 @@ show_help() {
   echo -e "  version-check [pkgname]                  Check local version vs upstream AUR/Project version"
   echo -e "  upgrade <pkgname> [options]              Upgrade package version to the latest upstream"
   echo -e "  import-key <key_id...>                   Import trusted GPG public key(s) into the keyring"
+  echo -e "  list-keys                                List GPG public keys in the repository keyring"
   echo -e "  publish                                  Publish/Sync the built package repository"
   echo -e "      Options for upgrade:"
   echo -e "         -f, --force                       Force upgrade even if local version is newer"
@@ -107,6 +108,9 @@ case "$cmd" in
     shift
     acquire_lock
     import_gpg_keys "$@"
+    ;;
+  list-keys)
+    list_gpg_keys
     ;;
   publish)
     acquire_lock

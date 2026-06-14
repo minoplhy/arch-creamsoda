@@ -39,8 +39,10 @@ log_error() {
 
 # Load configuration and set defaults
 load_config() {
-  # Isolate GPG home to prevent polluting or using developer's personal keyring
-  unset GNUPGHOME
+  # Isolate GPG home inside Docker container or when running tests, to prevent polluting developer's personal keyring
+  if [ -f /.dockerenv ] || [ "${IN_TEST:-}" = "true" ]; then
+    unset GNUPGHOME
+  fi
   local config_file="${WORKSPACE_DIR}/config.conf"
   if [ -f "$config_file" ]; then
     # shellcheck source=/dev/null
@@ -58,7 +60,9 @@ load_config() {
   export SIGN_PACKAGES="${SIGN_PACKAGES:-false}"
   export GPG_KEY="${GPG_KEY:-}"
   export CLEAN_OLD_PACKAGES="${CLEAN_OLD_PACKAGES:-true}"
-  export GNUPGHOME="${GNUPGHOME:-${WORKSPACE_DIR}/.gnupg}"
+  if [ -f /.dockerenv ] || [ "${IN_TEST:-}" = "true" ]; then
+    export GNUPGHOME="${GNUPGHOME:-${WORKSPACE_DIR}/.gnupg}"
+  fi
   export CACHE_SOURCES="${CACHE_SOURCES:-true}"
   export SOURCE_CACHE_DIR="${SOURCE_CACHE_DIR:-cache/sources}"
   export CHROOT_DIR="${CHROOT_DIR:-}"
@@ -71,7 +75,9 @@ load_config() {
   [[ "$REPO_DIR" = /* ]] || REPO_DIR="${WORKSPACE_DIR}/${REPO_DIR}"
   [[ "$PACKAGES_DIR" = /* ]] || PACKAGES_DIR="${WORKSPACE_DIR}/${PACKAGES_DIR}"
   [[ "$LOG_DIR" = /* ]] || LOG_DIR="${WORKSPACE_DIR}/${LOG_DIR}"
-  [[ "$GNUPGHOME" = /* ]] || GNUPGHOME="${WORKSPACE_DIR}/${GNUPGHOME}"
+  if [ -n "${GNUPGHOME:-}" ]; then
+    [[ "$GNUPGHOME" = /* ]] || GNUPGHOME="${WORKSPACE_DIR}/${GNUPGHOME}"
+  fi
   [[ "$SOURCE_CACHE_DIR" = /* ]] || SOURCE_CACHE_DIR="${WORKSPACE_DIR}/${SOURCE_CACHE_DIR}"
   [[ "$PACMAN_CACHE_DIR" = /* ]] || PACMAN_CACHE_DIR="${WORKSPACE_DIR}/${PACMAN_CACHE_DIR}"
   if [ -n "$CHROOT_DIR" ]; then
@@ -84,7 +90,9 @@ load_config() {
   export REPO_DIR
   export PACKAGES_DIR
   export LOG_DIR
-  export GNUPGHOME
+  if [ -n "${GNUPGHOME:-}" ]; then
+    export GNUPGHOME
+  fi
   export SOURCE_CACHE_DIR
   export CHROOT_DIR
   export PACMAN_CACHE_DIR

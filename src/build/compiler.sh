@@ -63,8 +63,12 @@ compile_and_register() {
       
       if [ -n "$pgp_keys" ]; then
         if command -v gpg >/dev/null 2>&1; then
+          local gpg_opts=("--no-permission-warning")
+          if [ -n "${GNUPGHOME:-}" ]; then
+            gpg_opts+=("--homedir" "$GNUPGHOME")
+          fi
           for key in $pgp_keys; do
-            if ! gpg --list-keys "$key" >/dev/null 2>&1; then
+            if ! gpg "${gpg_opts[@]}" --list-keys "$key" >/dev/null 2>&1; then
               log_warning "PGP key '${key}' is required but not present in the keyring."
               log_warning "Please import it manually using: ./manage.sh import-key ${key}"
               log_warning "PGP key '${key}' is missing. You can import it via: ./manage.sh import-key ${key}" >> "$log_file" 2>&1
@@ -232,13 +236,17 @@ compile_and_register() {
         continue
       fi
 
-      # Optional GPG Signing
-      local repo_add_opts=()
-      if [ "$SIGN_PACKAGES" = "true" ] && [ -n "$GPG_KEY" ]; then
-        for active_pkg_file in "${active_pkg_files[@]}"; do
-          log_info "Signing package $(basename "$active_pkg_file") with GPG Key: ${GPG_KEY}..."
-          gpg --detach-sign --no-armor --use-agent -u "$GPG_KEY" "$active_pkg_file" >> "$log_file" 2>&1
-        done
+       # Optional GPG Signing
+       local repo_add_opts=()
+       if [ "$SIGN_PACKAGES" = "true" ] && [ -n "$GPG_KEY" ]; then
+         local gpg_opts=("--no-permission-warning")
+         if [ -n "${GNUPGHOME:-}" ]; then
+           gpg_opts+=("--homedir" "$GNUPGHOME")
+         fi
+         for active_pkg_file in "${active_pkg_files[@]}"; do
+           log_info "Signing package $(basename "$active_pkg_file") with GPG Key: ${GPG_KEY}..."
+           gpg "${gpg_opts[@]}" --detach-sign --no-armor --use-agent -u "$GPG_KEY" "$active_pkg_file" >> "$log_file" 2>&1
+         done
         repo_add_opts+=("--sign" "--key" "$GPG_KEY")
       fi
 
