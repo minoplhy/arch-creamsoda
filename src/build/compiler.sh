@@ -117,10 +117,19 @@ compile_and_register() {
           sudo rm -rf "${active_chroot_dir}/extra-x86_64" >> "$log_file" 2>&1 || true
         fi
 
+        # Ensure chroot's makepkg.conf configures GNUPGHOME to point to the bind-mounted directory.
+        # This forces makepkg to run gpg with GNUPGHOME=/build/.gnupg even if HOME differs.
+        if { [ -f /.dockerenv ] || [ "${IN_TEST:-}" = "true" ]; } && [ -f "${chroot_root_path}/etc/makepkg.conf" ]; then
+          if ! grep -q "GNUPGHOME=" "${chroot_root_path}/etc/makepkg.conf"; then
+            log_info "Configuring GNUPGHOME=/build/.gnupg inside chroot's makepkg.conf..." >> "$log_file" 2>&1
+            echo 'export GNUPGHOME="/build/.gnupg"' | sudo tee -a "${chroot_root_path}/etc/makepkg.conf" >/dev/null 2>&1 || true
+          fi
+        fi
+
         # Workaround: systemd-nspawn inside Docker tries to allocate a systemd scope via D-Bus,
         # which fails because systemd is not running as PID 1 in the container.
         # We create a secure wrapper in /usr/local/bin to force --register=no and --keep-unit, which is preserved under sudo
-        if [ ! -f /usr/local/bin/systemd-nspawn ]; then
+        if [ -f /.dockerenv ] && [ ! -f /usr/local/bin/systemd-nspawn ]; then
           log_info "Creating secure systemd-nspawn wrapper in /usr/local/bin to force --register=no and --keep-unit..." >> "$log_file" 2>&1
           printf '#!/bin/bash\nexec /usr/bin/systemd-nspawn --register=no --keep-unit "$@"\n' | sudo tee /usr/local/bin/systemd-nspawn >/dev/null 2>&1 || true
           sudo chown root:root /usr/local/bin/systemd-nspawn >/dev/null 2>&1 || true
@@ -142,7 +151,7 @@ compile_and_register() {
         # Inside the clean chroot, makechrootpkg runs the build as the 'build' user,
         # whose home directory is set to '/build'. Binding to '/build/.gnupg' ensures
         # that the build user's GPG environment (~/.gnupg) can access the keys.
-        if [ -n "${GNUPGHOME:-}" ] && [ -d "$GNUPGHOME" ]; then
+        if { [ -f /.dockerenv ] || [ "${IN_TEST:-}" = "true" ]; } && [ -n "${GNUPGHOME:-}" ] && [ -d "$GNUPGHOME" ]; then
           makechrootpkg_opts+=("-d" "${GNUPGHOME}:/build/.gnupg")
         fi
 

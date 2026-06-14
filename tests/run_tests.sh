@@ -4,6 +4,7 @@
 
 # Resolve workspace root directory
 export WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export IN_TEST="true"
 
 # Source test scripts
 # shellcheck source=tests/test_helper.sh

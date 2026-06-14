@@ -35,8 +35,10 @@ RUN mkdir -p /var/lib/archbuild /var/cache/sources && \
     chown -R "${USERNAME}:${USERNAME}" /var/lib/archbuild /var/cache/sources && \
     chmod 777 /var/cache/sources && \
     sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /etc/makepkg.conf && \
+    echo 'export GNUPGHOME="/build/.gnupg"' >> /etc/makepkg.conf && \
     if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then \
-        sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /usr/share/devtools/makepkg-x86_64.conf; \
+        sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /usr/share/devtools/makepkg-x86_64.conf && \
+        echo 'export GNUPGHOME="/build/.gnupg"' >> /usr/share/devtools/makepkg-x86_64.conf; \
     fi
 
 # Install secure wrapper for systemd-nspawn to disable D-Bus/systemd registration when running inside Docker
