@@ -107,12 +107,11 @@ if [ "$etc_srcdest" != "/var/cache/sources" ]; then
 fi
 echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf SRCDEST is correctly set to /var/cache/sources"
 
-etc_gnupghome=$(grep "export GNUPGHOME=" /etc/makepkg.conf | cut -d= -f2 | tr -d '"' || true)
-if [ "$etc_gnupghome" != "/build/.gnupg" ]; then
-  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf GNUPGHOME is '${etc_gnupghome}', expected '/build/.gnupg'"
+if ! grep -q 'if \[ -f /.dockerenv \]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' /etc/makepkg.conf; then
+  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf does not set GNUPGHOME conditionally!"
   exit 1
 fi
-echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf GNUPGHOME is correctly set to /build/.gnupg"
+echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf GNUPGHOME is correctly set conditionally"
 
 # Check devtools makepkg.conf
 if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then
@@ -123,12 +122,11 @@ if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then
   fi
   echo -e "${GREEN}[OK]${NC} /usr/share/devtools/makepkg-x86_64.conf SRCDEST is correctly set to /var/cache/sources"
   
-  devtools_gnupghome=$(grep "export GNUPGHOME=" /usr/share/devtools/makepkg-x86_64.conf | cut -d= -f2 | tr -d '"' || true)
-  if [ "$devtools_gnupghome" != "/build/.gnupg" ]; then
-    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf GNUPGHOME is '${devtools_gnupghome}', expected '/build/.gnupg'"
+  if ! grep -q 'if \[ -f /.dockerenv \]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' /usr/share/devtools/makepkg-x86_64.conf; then
+    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf does not set GNUPGHOME conditionally!"
     exit 1
   fi
-  echo -e "${GREEN}[OK]${NC} /usr/share/devtools/makepkg-x86_64.conf GNUPGHOME is correctly set to /build/.gnupg"
+  echo -e "${GREEN}[OK]${NC} /usr/share/devtools/makepkg-x86_64.conf GNUPGHOME is correctly set conditionally"
 fi
 
 # Run a true command inside the container using systemd-nspawn

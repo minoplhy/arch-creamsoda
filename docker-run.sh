@@ -102,5 +102,6 @@ docker run --privileged -it --rm \
   -v "${SOURCE_CACHE_DIR}:/var/cache/sources" \
   "${EXTRA_MOUNTS[@]}" \
   -e GIT_BARE_DIR="${GIT_BARE_DIR}" \
+  -e WORKSPACE_DIR="${WORKSPACE_DIR}" \
   --name "${CONTAINER_NAME}" \
   "${IMAGE_NAME}"

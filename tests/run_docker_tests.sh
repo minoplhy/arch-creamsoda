@@ -36,6 +36,7 @@ docker run --privileged --rm \
   --tmpfs /tmp \
   -v "${WORKSPACE_DIR}:${WORKSPACE_DIR}" \
   -w "${WORKSPACE_DIR}" \
+  -e WORKSPACE_DIR="${WORKSPACE_DIR}" \
   --name "${CONTAINER_NAME}" \
   "${IMAGE_NAME}" \
   "${WORKSPACE_DIR}/tests/test_systemd_nspawn_inside_docker.sh"
