@@ -16,3 +16,7 @@ jobs:
       - name: Run Tests
         run: |
           ./tests/run_tests.sh
+
+      - name: Run Docker Integration Tests
+        run: |
+          ./tests/run_docker_tests.sh

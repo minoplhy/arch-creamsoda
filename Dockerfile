@@ -34,6 +34,11 @@ RUN ACTUAL_UID="${UID}"; \
 RUN mkdir -p /var/lib/archbuild && \
     chown -R "${USERNAME}:${USERNAME}" /var/lib/archbuild
 
+# Install secure wrapper for systemd-nspawn to disable D-Bus/systemd registration when running inside Docker
+RUN printf '#!/bin/bash\nexec /usr/bin/systemd-nspawn --register=no --keep-unit "$@"\n' > /usr/local/bin/systemd-nspawn && \
+    chown root:root /usr/local/bin/systemd-nspawn && \
+    chmod 0755 /usr/local/bin/systemd-nspawn
+
 USER ${USERNAME}
 WORKDIR /workspace
 

@@ -63,6 +63,28 @@ compile_and_register() {
       fi
 
       if [ "$BUILD_METHOD" = "chroot" ]; then
+        # Ensure host/container has a valid /etc/machine-id which systemd-nspawn requires
+        if [ ! -s /etc/machine-id ]; then
+          log_info "Initializing /etc/machine-id for systemd-nspawn..." >> "$log_file" 2>&1
+          if command -v systemd-machine-id-setup >/dev/null 2>&1; then
+            sudo systemd-machine-id-setup >> "$log_file" 2>&1 || true
+          elif command -v dbus-uuidgen >/dev/null 2>&1; then
+            sudo dbus-uuidgen --ensure=/etc/machine-id >> "$log_file" 2>&1 || true
+          else
+            # Fallback to generating a random 32-char hex string
+            echo "$(od -An -N16 -tx /dev/urandom | tr -d '[:space:]')" | sudo tee /etc/machine-id >/dev/null 2>&1 || true
+          fi
+        fi
+
+        # Ensure D-Bus system message bus is running, which systemd-nspawn requires to avoid D-Bus socket errors
+        if [ ! -S /run/dbus/system_bus_socket ]; then
+          log_info "Starting D-Bus system message bus daemon..." >> "$log_file" 2>&1
+          sudo mkdir -p /run/dbus >> "$log_file" 2>&1 || true
+          if command -v dbus-daemon >/dev/null 2>&1; then
+            sudo dbus-daemon --system --fork >> "$log_file" 2>&1 || true
+          fi
+        fi
+
         # Validate chroot to auto-recover from interrupted/corrupted builds
         local active_chroot_dir="/var/lib/archbuild"
         if [ -n "$CHROOT_DIR" ]; then
@@ -76,6 +98,16 @@ compile_and_register() {
           log_warning "Corrupted or incomplete chroot detected at ${chroot_root_path}. Cleaning up..." >> "$log_file" 2>&1
           # Clean up using sudo since chroot files are owned by root
           sudo rm -rf "${active_chroot_dir}/extra-x86_64" >> "$log_file" 2>&1 || true
+        fi
+
+        # Workaround: systemd-nspawn inside Docker tries to allocate a systemd scope via D-Bus,
+        # which fails because systemd is not running as PID 1 in the container.
+        # We create a secure wrapper in /usr/local/bin to force --register=no and --keep-unit, which is preserved under sudo
+        if [ ! -f /usr/local/bin/systemd-nspawn ]; then
+          log_info "Creating secure systemd-nspawn wrapper in /usr/local/bin to force --register=no and --keep-unit..." >> "$log_file" 2>&1
+          printf '#!/bin/bash\nexec /usr/bin/systemd-nspawn --register=no --keep-unit "$@"\n' | sudo tee /usr/local/bin/systemd-nspawn >/dev/null 2>&1 || true
+          sudo chown root:root /usr/local/bin/systemd-nspawn >/dev/null 2>&1 || true
+          sudo chmod 0755 /usr/local/bin/systemd-nspawn >/dev/null 2>&1 || true
         fi
 
         log_info "Compiling in clean chroot using extra-x86_64-build..." >> "$log_file" 2>&1

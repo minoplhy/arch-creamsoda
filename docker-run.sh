@@ -73,6 +73,8 @@ echo "--------------------------------------------------------------------------
 # - Mounts the pacman package cache to /var/cache/pacman/pkg inside the container
 # - Mounts the external bare Git repository directory if it lies outside the workspace
 docker run --privileged -it --rm \
+  --tmpfs /run \
+  --tmpfs /tmp \
   -v "${WORKSPACE_DIR}:${WORKSPACE_DIR}" \
   -w "${WORKSPACE_DIR}" \
   -v "${WORKSPACE_DIR}/cache/packages:/var/cache/pacman/pkg" \
