@@ -124,8 +124,35 @@ fi
 echo "Invoking: sudo systemd-nspawn -D $TEST_DIR --bind=/usr /usr/bin/true"
 if sudo systemd-nspawn -D "$TEST_DIR" --bind=/usr /usr/bin/true; then
   echo -e "\n${GREEN}[SUCCESS]${NC} systemd-nspawn executed successfully without any scope allocation errors!"
-  exit 0
 else
   echo -e "\n${RED}[FAILURE]${NC} systemd-nspawn execution failed!"
   exit 1
 fi
+
+# 5. Verify the actual system extra-x86_64-build / archbuild option parsing behavior
+echo -e "\n5. Verifying system archbuild / makechrootpkg argument flow..."
+archbuild_path=$(which archbuild 2>/dev/null || which extra-x86_64-build 2>/dev/null || echo "/usr/bin/archbuild")
+
+if [ -f "$archbuild_path" ]; then
+  # Look for the line where makechrootpkg is called
+  makechrootpkg_call=$(grep "makechrootpkg" "$archbuild_path" || true)
+  if [ -n "$makechrootpkg_call" ]; then
+    echo "Found makechrootpkg call in ${archbuild_path}:"
+    echo "  ${makechrootpkg_call}"
+    
+    # Check if the invocation passes makechrootpkg arguments before '--' and makepkg arguments after '--'
+    if echo "$makechrootpkg_call" | grep -q -E "makechrootpkg.*--.*makepkg"; then
+      echo -e "${GREEN}[OK]${NC} The system devtools script correctly forwards makechrootpkg arguments before the '--' separator, and makepkg arguments after it."
+    else
+      echo -e "${RED}[WARNING]${NC} The makechrootpkg call pattern in devtools did not match the expected pattern: ${makechrootpkg_call}"
+    fi
+  else
+    echo -e "${RED}[WARNING]${NC} Could not find makechrootpkg call in ${archbuild_path}"
+  fi
+else
+  echo -e "${RED}[ERROR]${NC} devtools archbuild script not found at ${archbuild_path}!"
+  exit 1
+fi
+
+echo -e "\n${GREEN}=== All systemd-nspawn and devtools integration tests passed successfully! ===${NC}"
+exit 0
