@@ -39,6 +39,9 @@ run_build_tests() {
     local has_cache_flag
     has_cache_flag=$(grep -c "\-d .*cache/packages:/var/cache/pacman/pkg" extra_x86_64_build_args.log)
     assert_success "[ \"$has_cache_flag\" -gt 0 ]" "Clean chroot called with pacman package cache bind mount (-d)"
+    local has_gpg_flag
+    has_gpg_flag=$(grep -c "\-d .*\.gnupg:/build/.gnupg" extra_x86_64_build_args.log)
+    assert_success "[ \"$has_gpg_flag\" -gt 0 ]" "Clean chroot called with GPG keyring bind mount (-d)"
   fi
   rm -f extra_x86_64_build_args.log
 

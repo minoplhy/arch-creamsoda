@@ -138,6 +138,13 @@ compile_and_register() {
         if [ "$CACHE_PACMAN_PACKAGES" = "true" ] && [ -n "$abs_pacman_cache_dir" ]; then
           makechrootpkg_opts+=("-d" "${abs_pacman_cache_dir}:/var/cache/pacman/pkg")
         fi
+        # Bind mount GNUPGHOME to the chroot build user's home directory.
+        # Inside the clean chroot, makechrootpkg runs the build as the 'build' user,
+        # whose home directory is set to '/build'. Binding to '/build/.gnupg' ensures
+        # that the build user's GPG environment (~/.gnupg) can access the keys.
+        if [ -n "${GNUPGHOME:-}" ] && [ -d "$GNUPGHOME" ]; then
+          makechrootpkg_opts+=("-d" "${GNUPGHOME}:/build/.gnupg")
+        fi
 
         # Extract dependencies from PKGBUILD to only install required local dependencies
         local deps=()
