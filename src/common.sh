@@ -68,6 +68,8 @@ load_config() {
   export CHROOT_DIR="${CHROOT_DIR:-}"
   export CACHE_PACMAN_PACKAGES="${CACHE_PACMAN_PACKAGES:-true}"
   export PACMAN_CACHE_DIR="${PACMAN_CACHE_DIR:-cache/packages}"
+  export CACHE_COMPILER="${CACHE_COMPILER:-true}"
+  export CCACHE_DIR="${CCACHE_DIR:-cache/ccache}"
   export PUBLISH_DEST="${PUBLISH_DEST:-}"
   export GIT_BARE_DIR="${GIT_BARE_DIR:-}"
 
@@ -80,6 +82,7 @@ load_config() {
   fi
   [[ "$SOURCE_CACHE_DIR" = /* ]] || SOURCE_CACHE_DIR="${WORKSPACE_DIR}/${SOURCE_CACHE_DIR}"
   [[ "$PACMAN_CACHE_DIR" = /* ]] || PACMAN_CACHE_DIR="${WORKSPACE_DIR}/${PACMAN_CACHE_DIR}"
+  [[ "$CCACHE_DIR" = /* ]] || CCACHE_DIR="${WORKSPACE_DIR}/${CCACHE_DIR}"
   if [ -n "$CHROOT_DIR" ]; then
     [[ "$CHROOT_DIR" = /* ]] || CHROOT_DIR="${WORKSPACE_DIR}/${CHROOT_DIR}"
   fi
@@ -96,6 +99,8 @@ load_config() {
   export SOURCE_CACHE_DIR
   export CHROOT_DIR
   export PACMAN_CACHE_DIR
+  export CACHE_COMPILER
+  export CCACHE_DIR
   export GIT_BARE_DIR
 }
 
@@ -124,6 +129,10 @@ init_dirs() {
   fi
   if [ "$CACHE_PACMAN_PACKAGES" = "true" ]; then
     mkdir -p "$PACMAN_CACHE_DIR"
+  fi
+  if [ "$CACHE_COMPILER" = "true" ]; then
+    mkdir -p "$CCACHE_DIR"
+    chmod 777 "$CCACHE_DIR" 2>/dev/null || true
   fi
 }
 

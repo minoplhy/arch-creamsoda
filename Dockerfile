@@ -14,7 +14,7 @@ ARG USERNAME=builder
 # - sudo: Required for chroot build commands (systemd-nspawn)
 # - rsync: Needed for publishing repository files
 RUN pacman -Syu --noconfirm && \
-    pacman -S --noconfirm base-devel devtools git sudo rsync less
+    pacman -S --noconfirm base-devel devtools git sudo rsync less ccache
 
 # Configure Git system-wide to trust all directories (safe.directory)
 # This avoids "dubious ownership" errors when mounting workspaces or running via sudo
@@ -31,13 +31,19 @@ RUN ACTUAL_UID="${UID}"; \
     chmod 0440 "/etc/sudoers.d/${USERNAME}"
 
 # Pre-configure the base directory for devtools chroots and package cache
-RUN mkdir -p /var/lib/archbuild /var/cache/sources && \
-    chown -R "${USERNAME}:${USERNAME}" /var/lib/archbuild /var/cache/sources && \
-    chmod 777 /var/cache/sources && \
+RUN mkdir -p /var/lib/archbuild /var/cache/sources /var/cache/ccache && \
+    chown -R "${USERNAME}:${USERNAME}" /var/lib/archbuild /var/cache/sources /var/cache/ccache && \
+    chmod 777 /var/cache/sources /var/cache/ccache && \
     sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /etc/makepkg.conf && \
+    sed -i 's|^#MAKEFLAGS=.*|MAKEFLAGS="-j\$((\$(nproc) > 1 ? \$(nproc) - 1 : 1))"|' /etc/makepkg.conf && \
+    sed -i 's/!ccache/ccache/g' /etc/makepkg.conf && \
+    echo 'export CCACHE_DIR="/var/cache/ccache"' >> /etc/makepkg.conf && \
     echo 'if [ -f /.dockerenv ]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' >> /etc/makepkg.conf && \
     if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then \
         sed -i 's|^#SRCDEST=.*|SRCDEST=/var/cache/sources|' /usr/share/devtools/makepkg-x86_64.conf && \
+        sed -i 's|^#MAKEFLAGS=.*|MAKEFLAGS="-j\$((\$(nproc) > 1 ? \$(nproc) - 1 : 1))"|' /usr/share/devtools/makepkg-x86_64.conf && \
+        sed -i 's/!ccache/ccache/g' /usr/share/devtools/makepkg-x86_64.conf && \
+        echo 'export CCACHE_DIR="/var/cache/ccache"' >> /usr/share/devtools/makepkg-x86_64.conf && \
         echo 'if [ -f /.dockerenv ]; then export GNUPGHOME="${WORKSPACE_DIR:-/workspace}/.gnupg"; fi' >> /usr/share/devtools/makepkg-x86_64.conf && \
         echo 'if [ -d /build/.gnupg ]; then export GNUPGHOME="/build/.gnupg"; fi' >> /usr/share/devtools/makepkg-x86_64.conf; \
     fi

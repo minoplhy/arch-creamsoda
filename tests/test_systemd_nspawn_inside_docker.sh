@@ -99,6 +99,18 @@ if [ "$sources_perms" != "777" ]; then
 fi
 echo -e "${GREEN}[OK]${NC} /var/cache/sources directory is globally writable (777)"
 
+if [ ! -d /var/cache/ccache ]; then
+  echo -e "${RED}[ERROR]${NC} /var/cache/ccache directory does not exist!"
+  exit 1
+fi
+
+ccache_perms=$(stat -c '%a' /var/cache/ccache)
+if [ "$ccache_perms" != "777" ]; then
+  echo -e "${RED}[ERROR]${NC} /var/cache/ccache permissions are ${ccache_perms}, expected 777"
+  exit 1
+fi
+echo -e "${GREEN}[OK]${NC} /var/cache/ccache directory is globally writable (777)"
+
 # Check etc makepkg.conf
 etc_srcdest=$(grep "^SRCDEST=" /etc/makepkg.conf | cut -d= -f2 | tr -d '"' || true)
 if [ "$etc_srcdest" != "/var/cache/sources" ]; then
@@ -112,6 +124,25 @@ if ! grep -q 'if \[ -f /.dockerenv \]; then export GNUPGHOME="${WORKSPACE_DIR:-/
   exit 1
 fi
 echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf GNUPGHOME is correctly set conditionally"
+
+# Check makepkg ccache/MAKEFLAGS options
+if grep -E "^(BUILDENV|OPTIONS)=" /etc/makepkg.conf | grep -q "!ccache"; then
+  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf has ccache disabled via '!ccache'!"
+  exit 1
+fi
+if ! grep -E "^(BUILDENV|OPTIONS)=" /etc/makepkg.conf | grep -q "ccache"; then
+  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf does not enable 'ccache' in BUILDENV or OPTIONS!"
+  exit 1
+fi
+if ! grep -q 'CCACHE_DIR="/var/cache/ccache"' /etc/makepkg.conf; then
+  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf CCACHE_DIR is not set to /var/cache/ccache!"
+  exit 1
+fi
+if ! grep -q 'MAKEFLAGS="-j$(($(nproc) > 1 ? $(nproc) - 1 : 1))"' /etc/makepkg.conf; then
+  echo -e "${RED}[ERROR]${NC} /etc/makepkg.conf MAKEFLAGS is not configured with dynamic core formula!"
+  exit 1
+fi
+echo -e "${GREEN}[OK]${NC} /etc/makepkg.conf ccache and MAKEFLAGS are correctly configured"
 
 # Check devtools makepkg.conf
 if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then
@@ -127,6 +158,24 @@ if [ -f /usr/share/devtools/makepkg-x86_64.conf ]; then
     exit 1
   fi
   echo -e "${GREEN}[OK]${NC} /usr/share/devtools/makepkg-x86_64.conf GNUPGHOME is correctly set conditionally"
+
+  if grep -E "^(BUILDENV|OPTIONS)=" /usr/share/devtools/makepkg-x86_64.conf | grep -q "!ccache"; then
+    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf has ccache disabled via '!ccache'!"
+    exit 1
+  fi
+  if ! grep -E "^(BUILDENV|OPTIONS)=" /usr/share/devtools/makepkg-x86_64.conf | grep -q "ccache"; then
+    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf does not enable 'ccache' in BUILDENV or OPTIONS!"
+    exit 1
+  fi
+  if ! grep -q 'CCACHE_DIR="/var/cache/ccache"' /usr/share/devtools/makepkg-x86_64.conf; then
+    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf CCACHE_DIR is not set to /var/cache/ccache!"
+    exit 1
+  fi
+  if ! grep -q 'MAKEFLAGS="-j$(($(nproc) > 1 ? $(nproc) - 1 : 1))"' /usr/share/devtools/makepkg-x86_64.conf; then
+    echo -e "${RED}[ERROR]${NC} /usr/share/devtools/makepkg-x86_64.conf MAKEFLAGS is not configured with dynamic core formula!"
+    exit 1
+  fi
+  echo -e "${GREEN}[OK]${NC} /usr/share/devtools/makepkg-x86_64.conf ccache and MAKEFLAGS are correctly configured"
 fi
 
 # Run a true command inside the container using systemd-nspawn

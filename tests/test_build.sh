@@ -25,6 +25,7 @@ run_build_tests() {
   assert_file_exists "repo/librewolf-bin-debug-126.0.0-1-any.pkg.tar.zst" "Debug librewolf-bin package moved to repo/"
   assert_success "[ -d cache/sources ]" "Source cache directory cache/sources exists"
   assert_success "[ -d cache/packages ]" "Pacman package cache directory cache/packages exists"
+  assert_success "[ -d cache/ccache ]" "Compiler cache directory cache/ccache exists"
   
   # Check status.json content is correct
   local repo_status
@@ -42,6 +43,12 @@ run_build_tests() {
     local has_gpg_flag
     has_gpg_flag=$(grep -c "\-d .*\.gnupg:/build/.gnupg" extra_x86_64_build_args.log)
     assert_success "[ \"$has_gpg_flag\" -gt 0 ]" "Clean chroot called with GPG keyring bind mount (-d)"
+    local has_ccache_flag
+    has_ccache_flag=$(grep -c "\-d .*cache/ccache:/ccache" extra_x86_64_build_args.log)
+    assert_success "[ \"$has_ccache_flag\" -gt 0 ]" "Clean chroot called with ccache compiler cache bind mount (-d)"
+    local has_ccache_dir_env
+    has_ccache_dir_env=$(grep -c "CCACHE_DIR=/ccache" extra_x86_64_build_args.log)
+    assert_success "[ \"$has_ccache_dir_env\" -gt 0 ]" "Clean chroot called with CCACHE_DIR=/ccache environment argument"
     
     # Assert that devtools options (-d, -I) are placed after the first "--" separator in extra-x86_64-build
     assert_success "grep -q -- \" -- .* \-d \" extra_x86_64_build_args.log" "GPG/pacman cache mounts passed after the -- separator"
@@ -176,6 +183,7 @@ run_build_tests() {
   log_info "TEST: Verify cache directories permissions..."
   assert_success "[ \"\$(stat -c %a cache/sources)\" = \"777\" ]" "cache/sources directory is globally writable (777)"
   assert_success "[ \"\$(stat -c %a cache/packages)\" = \"777\" ]" "cache/packages directory is globally writable (777)"
+  assert_success "[ \"\$(stat -c %a cache/ccache)\" = \"777\" ]" "cache/ccache directory is globally writable (777)"
   
   # Test Case 10: GPG directory ownership mismatch check
   log_info "TEST: GPG directory ownership mismatch check..."

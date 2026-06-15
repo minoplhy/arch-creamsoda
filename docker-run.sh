@@ -16,22 +16,30 @@ CONTAINER_NAME="arch-builder"
 # Load values from config.conf if it exists
 if [ -f "${WORKSPACE_DIR}/config.conf" ]; then
   # Extract cache settings safely from the config file
-  eval "$(grep -E '^(SOURCE_CACHE_DIR|PACMAN_CACHE_DIR|CHROOT_DIR)=' "${WORKSPACE_DIR}/config.conf")"
+  eval "$(grep -E '^(SOURCE_CACHE_DIR|PACMAN_CACHE_DIR|CHROOT_DIR|CACHE_COMPILER|CCACHE_DIR)=' "${WORKSPACE_DIR}/config.conf")"
 fi
 
 # Fallback defaults
 SOURCE_CACHE_DIR="${SOURCE_CACHE_DIR:-cache/sources}"
 PACMAN_CACHE_DIR="${PACMAN_CACHE_DIR:-cache/packages}"
 CHROOT_DIR="${CHROOT_DIR:-cache/chroot}"
+CACHE_COMPILER="${CACHE_COMPILER:-true}"
+CCACHE_DIR="${CCACHE_DIR:-cache/ccache}"
 
 # Resolve relative paths to absolute paths under WORKSPACE_DIR
 [[ "$SOURCE_CACHE_DIR" = /* ]] || SOURCE_CACHE_DIR="${WORKSPACE_DIR}/${SOURCE_CACHE_DIR}"
 [[ "$PACMAN_CACHE_DIR" = /* ]] || PACMAN_CACHE_DIR="${WORKSPACE_DIR}/${PACMAN_CACHE_DIR}"
 [[ "$CHROOT_DIR" = /* ]] || CHROOT_DIR="${WORKSPACE_DIR}/${CHROOT_DIR}"
+[[ "$CCACHE_DIR" = /* ]] || CCACHE_DIR="${WORKSPACE_DIR}/${CCACHE_DIR}"
 
 # Ensure cache directories exist on the host and have correct permissions
 mkdir -p "$SOURCE_CACHE_DIR" "$PACMAN_CACHE_DIR" "$CHROOT_DIR"
 chmod 777 "$SOURCE_CACHE_DIR" "$PACMAN_CACHE_DIR" "$CHROOT_DIR"
+
+if [ "$CACHE_COMPILER" = "true" ]; then
+  mkdir -p "$CCACHE_DIR"
+  chmod 777 "$CCACHE_DIR"
+fi
 
 # Build the docker image matching the current host user's UID and GID
 echo "Building docker image '${IMAGE_NAME}' matching host user UID=$(id -u) GID=$(id -g)..."
@@ -84,6 +92,10 @@ if [ -n "${CHROOT_DIR}" ] && [ "${CHROOT_DIR}" != "${WORKSPACE_DIR}" ] && [[ "${
   EXTRA_MOUNTS+=("-v" "${CHROOT_DIR}:${CHROOT_DIR}")
 fi
 
+if [ "$CACHE_COMPILER" = "true" ]; then
+  EXTRA_MOUNTS+=("-v" "${CCACHE_DIR}:/var/cache/ccache")
+fi
+
 echo "--------------------------------------------------------------------------------"
 echo "Starting container '${CONTAINER_NAME}' in privileged mode..."
 echo "All files compiled will be owned by user '$(id -un)' ($(id -u):$(id -g))."
@@ -104,5 +116,7 @@ docker run --privileged -it --rm \
   -e GIT_BARE_DIR="${GIT_BARE_DIR}" \
   -e WORKSPACE_DIR="${WORKSPACE_DIR}" \
   -e GNUPGHOME="${WORKSPACE_DIR}/.gnupg" \
+  -e CACHE_COMPILER="${CACHE_COMPILER}" \
+  -e CCACHE_DIR="${CCACHE_DIR}" \
   --name "${CONTAINER_NAME}" \
   "${IMAGE_NAME}"

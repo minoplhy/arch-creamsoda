@@ -26,6 +26,13 @@ compile_and_register() {
     chmod 777 "$abs_pacman_cache_dir" 2>/dev/null || true
   fi
 
+  local abs_ccache_dir=""
+  if [ "$CACHE_COMPILER" = "true" ] && [ -n "${CCACHE_DIR:-}" ]; then
+    mkdir -p "$CCACHE_DIR"
+    abs_ccache_dir=$(cd "$CCACHE_DIR" && pwd)
+    chmod 777 "$abs_ccache_dir" 2>/dev/null || true
+  fi
+
 
 
   log_info "Starting compilation queue of ${#BUILD_QUEUE[@]} packages..."
@@ -113,6 +120,14 @@ compile_and_register() {
         fi
         
         local chroot_root_path="${active_chroot_dir}/extra-x86_64/root"
+
+        # Pre-initialize clean chroot if it doesn't exist so we can configure it
+        if [ ! -d "${chroot_root_path}" ]; then
+          log_info "Pre-initializing clean chroot at ${active_chroot_dir}..." >> "$log_file" 2>&1
+          sudo mkdir -p "${chroot_root_path}"
+          sudo mkarchroot -C /usr/share/devtools/pacman-extra.conf "${chroot_root_path}" base-devel >> "$log_file" 2>&1 || true
+        fi
+
         if [ -d "${active_chroot_dir}/extra-x86_64" ] && [ ! -f "${chroot_root_path}/.arch-chroot" ]; then
           log_warning "Corrupted or incomplete chroot detected at ${chroot_root_path}."
           log_warning "Cleaning up corrupted chroot directory to force a clean re-initialization..."
@@ -121,12 +136,34 @@ compile_and_register() {
           sudo rm -rf "${active_chroot_dir}/extra-x86_64" >> "$log_file" 2>&1 || true
         fi
 
-        # Ensure chroot's makepkg.conf configures GNUPGHOME to point to the bind-mounted directory.
-        # This forces makepkg to run gpg with GNUPGHOME=/build/.gnupg even if HOME differs.
-        if { [ -f /.dockerenv ] || [ "${IN_TEST:-}" = "true" ]; } && [ -f "${chroot_root_path}/etc/makepkg.conf" ]; then
-          if ! grep -q "GNUPGHOME=" "${chroot_root_path}/etc/makepkg.conf"; then
-            log_info "Configuring GNUPGHOME=/build/.gnupg inside chroot's makepkg.conf..." >> "$log_file" 2>&1
-            echo 'export GNUPGHOME="/build/.gnupg"' | sudo tee -a "${chroot_root_path}/etc/makepkg.conf" >/dev/null 2>&1 || true
+        # Ensure chroot's makepkg.conf has correct GPG and compiler caching settings
+        if [ -f "${chroot_root_path}/etc/makepkg.conf" ]; then
+          if { [ -f /.dockerenv ] || [ "${IN_TEST:-}" = "true" ]; }; then
+            if ! grep -q "GNUPGHOME=" "${chroot_root_path}/etc/makepkg.conf"; then
+              log_info "Configuring GNUPGHOME=/build/.gnupg inside chroot's makepkg.conf..." >> "$log_file" 2>&1
+              echo 'export GNUPGHOME="/build/.gnupg"' | sudo tee -a "${chroot_root_path}/etc/makepkg.conf" >/dev/null 2>&1 || true
+            fi
+          fi
+
+          if [ "$CACHE_COMPILER" = "true" ]; then
+            # Ensure ccache is installed inside the chroot
+            if [ ! -f "${chroot_root_path}/usr/bin/ccache" ]; then
+              log_info "Installing ccache inside chroot..." >> "$log_file" 2>&1
+              sudo arch-nspawn "${chroot_root_path}" pacman -Syu --noconfirm ccache >> "$log_file" 2>&1 || true
+            fi
+            
+            # Configure ccache inside chroot
+            if ! grep -q "CCACHE_DIR=" "${chroot_root_path}/etc/makepkg.conf"; then
+              log_info "Configuring ccache inside chroot's makepkg.conf..." >> "$log_file" 2>&1
+              echo 'export CCACHE_DIR="/ccache"' | sudo tee -a "${chroot_root_path}/etc/makepkg.conf" >/dev/null 2>&1 || true
+              sudo sed -i 's/!ccache/ccache/g' "${chroot_root_path}/etc/makepkg.conf" >/dev/null 2>&1 || true
+            fi
+          else
+            # Explicitly disable ccache inside chroot
+            if grep -q "ccache" "${chroot_root_path}/etc/makepkg.conf" && ! grep -q "!ccache" "${chroot_root_path}/etc/makepkg.conf"; then
+              log_info "Disabling ccache inside chroot's makepkg.conf..." >> "$log_file" 2>&1
+              sudo sed -i 's/ccache/!ccache/g' "${chroot_root_path}/etc/makepkg.conf" >/dev/null 2>&1 || true
+            fi
           fi
         fi
 
@@ -150,6 +187,9 @@ compile_and_register() {
         local makechrootpkg_opts=()
         if [ "$CACHE_PACMAN_PACKAGES" = "true" ] && [ -n "$abs_pacman_cache_dir" ]; then
           makechrootpkg_opts+=("-d" "${abs_pacman_cache_dir}:/var/cache/pacman/pkg")
+        fi
+        if [ "$CACHE_COMPILER" = "true" ] && [ -n "$abs_ccache_dir" ]; then
+          makechrootpkg_opts+=("-d" "${abs_ccache_dir}:/ccache")
         fi
         # Bind mount GNUPGHOME to the chroot build user's home directory.
         # Inside the clean chroot, makechrootpkg runs the build as the 'build' user,
@@ -197,7 +237,13 @@ compile_and_register() {
           fi
         done
         
-        extra-x86_64-build "${chroot_opts[@]}" -- "${makechrootpkg_opts[@]}" >> "$log_file" 2>&1
+        # Append CCACHE_DIR setting as a makepkg argument after a "--" separator if compiler caching is enabled
+        local extra_makepkg_args=()
+        if [ "$CACHE_COMPILER" = "true" ]; then
+          extra_makepkg_args+=("--" "CCACHE_DIR=/ccache")
+        fi
+
+        extra-x86_64-build "${chroot_opts[@]}" -- "${makechrootpkg_opts[@]}" "${extra_makepkg_args[@]}" >> "$log_file" 2>&1
       else
         log_info "Compiling with makepkg..." >> "$log_file" 2>&1
         # makepkg -s (install dependencies), --noconfirm (non-interactive)
