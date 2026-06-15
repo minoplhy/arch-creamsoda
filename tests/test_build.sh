@@ -202,6 +202,29 @@ run_build_tests() {
   assert_file_exists "repo/librewolf-bin-debug-126.0.0-1-any.pkg.tar.zst.sig" "Debug package signature created"
   mv config.conf.bak config.conf
 
+  # Test Case 12: Specific package force rebuild verification
+  log_info "TEST: Specific package force rebuild verification..."
+  assert_success "./build.sh" "Ensure all packages are built and database is up to date"
+  rm -rf logs/*
+  assert_success "./build.sh -f test-pkg-copy" "Run force rebuild for specific package"
+  local compiled_test_pkg
+  compiled_test_pkg=$(find logs/ -name "test-pkg-copy-*.log" | wc -l)
+  assert_equals "1" "$compiled_test_pkg" "test-pkg-copy was compiled"
+  local compiled_librewolf
+  compiled_librewolf=$(find logs/ -name "librewolf-bin-*.log" | wc -l)
+  assert_equals "0" "$compiled_librewolf" "librewolf-bin was skipped"
+  assert_failure "./build.sh -f non-existent-pkg" "Should fail when forcing non-existent package"
+
+  # Verify that running without package argument rebuilds all
+  rm -rf logs/*
+  assert_success "./build.sh -f" "Run force rebuild with no package argument (should rebuild all)"
+  local compiled_test_pkg_all
+  compiled_test_pkg_all=$(find logs/ -name "test-pkg-copy-*.log" | wc -l)
+  assert_equals "1" "$compiled_test_pkg_all" "test-pkg-copy was force rebuilt"
+  local compiled_librewolf_all
+  compiled_librewolf_all=$(find logs/ -name "librewolf-bin-*.log" | wc -l)
+  assert_equals "1" "$compiled_librewolf_all" "librewolf-bin was force rebuilt"
+
   # Cleanup
   ./manage.sh delete pgp-pkg >/dev/null
   rm -f gpg_imports.log build_gpg_warn.txt build_gpg_clean.txt
