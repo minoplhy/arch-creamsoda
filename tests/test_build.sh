@@ -223,6 +223,26 @@ run_build_tests() {
   assert_equals "0" "$compiled_librewolf" "librewolf-bin was skipped"
   assert_failure "./build.sh -f non-existent-pkg" "Should fail when forcing non-existent package"
 
+  # Verify that other outstanding updates are ignored when forcing a specific package
+  # Introduce outstanding update on librewolf-bin (which would normally trigger a scan build)
+  echo -e "pkgname=librewolf-bin\npkgver=127.0.0\npkgrel=1" > packages/librewolf-bin/PKGBUILD
+  (
+    cd packages/librewolf-bin || exit 1
+    git add PKGBUILD
+    git commit -m "bump librewolf-bin version to 127.0.0" --quiet
+  )
+  rm -rf logs/*
+  assert_success "./build.sh -f test-pkg-copy" "Run specific package force rebuild when other packages have outstanding updates"
+  compiled_test_pkg=$(find logs/ -name "test-pkg-copy-*.log" | wc -l)
+  assert_equals "1" "$compiled_test_pkg" "Only test-pkg-copy was compiled"
+  compiled_librewolf=$(find logs/ -name "librewolf-bin-*.log" | wc -l)
+  assert_equals "0" "$compiled_librewolf" "librewolf-bin was skipped despite having outstanding updates"
+  # Revert the temporary version bump commit
+  (
+    cd packages/librewolf-bin || exit 1
+    git reset --hard HEAD~1 --quiet
+  )
+
   # Verify that running without package argument rebuilds all
   rm -rf logs/*
   assert_success "./build.sh -f" "Run force rebuild with no package argument (should rebuild all)"

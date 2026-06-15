@@ -50,16 +50,11 @@ done
 # Acquire repository lock for build safety
 acquire_lock
 
-# Run scanner
-scan_packages_for_changes
-
-if [ "$scan_only" = "true" ]; then
-  log_info "Scan-only mode. Skipping compilation."
-  exit 0
-fi
-
-# Force rebuild if specified
 if [ "$force_rebuild" = "true" ]; then
+  # Initialize the global build queue array
+  unset BUILD_QUEUE
+  declare -g -A BUILD_QUEUE
+
   if [ -n "$force_rebuild_package" ] && [ "$force_rebuild_package" != "all" ]; then
     log_info "Force-rebuild flag specified. Forcing compilation of specific package branch: ${force_rebuild_package}..."
     if git show "${force_rebuild_package}:PKGBUILD" &>/dev/null; then
@@ -83,6 +78,14 @@ if [ "$force_rebuild" = "true" ]; then
       git_ver=$(parse_pkgbuild_version "$pkgbuild_content")
       BUILD_QUEUE["$branch"]="$git_ver"
     done
+  fi
+else
+  # Run scanner
+  scan_packages_for_changes
+
+  if [ "$scan_only" = "true" ]; then
+    log_info "Scan-only mode. Skipping compilation."
+    exit 0
   fi
 fi
 
