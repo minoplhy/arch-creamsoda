@@ -155,6 +155,13 @@ done
 tar -czf "$db_file" -C "$tmp_tar_dir" . >/dev/null 2>&1
 rm -rf "$tmp_tar_dir"
 
+# Sign database file if --sign option is present
+for arg in "$@"; do
+  if [ "$arg" = "--sign" ]; then
+    touch "${db_file}.sig"
+  fi
+done
+
 exit 0
 EOF
   chmod +x "${MOCKS_DIR}/repo-add"

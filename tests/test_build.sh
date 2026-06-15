@@ -190,6 +190,18 @@ run_build_tests() {
   rm -rf mock_gpg_home gpg_ownership_test.txt
   export GNUPGHOME="$original_gnupg"
 
+  # Test Case 11: Package and database GPG signing verification (SIGN_PACKAGES=true)
+  log_info "TEST: Package and database GPG signing verification..."
+  rm -rf repo/*
+  cp config.conf config.conf.bak
+  echo -e "\nSIGN_PACKAGES=\"true\"\nGPG_KEY=\"MOCK_SIGNING_KEY_ID\"\nGNUPGHOME=\".gnupg\"" >> config.conf
+  assert_success "./build.sh -f" "Builder execution with GPG signing enabled"
+  assert_file_exists "repo/custom.db.tar.gz" "Repository database created"
+  assert_file_exists "repo/custom.db.tar.gz.sig" "Repository database signature created"
+  assert_file_exists "repo/librewolf-bin-126.0.0-1-any.pkg.tar.zst.sig" "Main package signature created"
+  assert_file_exists "repo/librewolf-bin-debug-126.0.0-1-any.pkg.tar.zst.sig" "Debug package signature created"
+  mv config.conf.bak config.conf
+
   # Cleanup
   ./manage.sh delete pgp-pkg >/dev/null
   rm -f gpg_imports.log build_gpg_warn.txt build_gpg_clean.txt
