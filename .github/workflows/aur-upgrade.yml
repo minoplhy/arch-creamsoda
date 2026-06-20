@@ -114,6 +114,6 @@ jobs:
           chown builder:builder run-upgrade.sh
           
           # Run the script as the builder user
-          sudo -u builder -i sh -c "export GITHUB_WORKSPACE='$GITHUB_WORKSPACE'; /bin/bash '$GITHUB_WORKSPACE/run-upgrade.sh'"
+          sudo -u builder -i sh -c "export GITHUB_WORKSPACE='$GITHUB_WORKSPACE' GITHUB_TOKEN='$GITHUB_TOKEN'; /bin/bash '$GITHUB_WORKSPACE/run-upgrade.sh'"
 
 
