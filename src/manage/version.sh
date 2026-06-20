@@ -83,9 +83,117 @@ get_source_project_version() {
     return 1
   fi
 
+  # Check if it uses git tag-pinned sources standard (matching git+ and #tag=)
+  if grep -q "git\+.*#tag=" "$pkgbuild_path"; then
+    log_info "Running git tag-pinned upgrade check for '${pkgname}'..." >&2
+    
+    # 1. Get source URL
+    local src_url=""
+    src_url=$(pkgbuild_path="$pkgbuild_path" bash -c '
+      source "$pkgbuild_path" &>/dev/null
+      for src in "${source[@]}"; do
+        if [[ "$src" =~ git\+ ]]; then
+          url="${src#git+}"
+          url="${url%%\?*}"
+          url="${url%%#*}"
+          echo "$url"
+          exit 0
+        fi
+      done
+    ' 2>/dev/null)
+    
+    if [ -n "$src_url" ]; then
+      local tags_list
+      tags_list=$(git ls-remote --tags "$src_url" 2>/dev/null)
+      
+      if [ -n "$tags_list" ]; then
+        # 2. Get current pkgver & pkgrel
+        local current_pkgver
+        current_pkgver=$(grep -E "^pkgver=" "$pkgbuild_path" | cut -d'=' -f2- | tr -d '"'\')
+        local current_pkgrel
+        current_pkgrel=$(grep -E "^pkgrel=" "$pkgbuild_path" | cut -d'=' -f2- | tr -d '"'\')
+        [ -z "$current_pkgrel" ] && current_pkgrel="1"
+        
+        # 3. Detect prefix
+        local prefix=""
+        local found_prefix=false
+        while read -r hash ref; do
+          [ -z "$ref" ] && continue
+          local tag_name="${ref#refs/tags/}"
+          [[ "$tag_name" == *^{} ]] && continue
+          if [[ "$tag_name" == *"${current_pkgver}" ]]; then
+            prefix="${tag_name%"${current_pkgver}"}"
+            found_prefix=true
+            break
+          fi
+        done <<< "$tags_list"
+        
+        if [ "$found_prefix" = false ]; then
+          local tag_line
+          tag_line=$(grep -E "^\s*_tag=" "$pkgbuild_path")
+          if [[ "$tag_line" =~ git\ rev-parse\ [\'\"]?([a-zA-Z0-9_-]*)\$pkgver ]]; then
+            prefix="${BASH_REMATCH[1]}"
+            found_prefix=true
+          fi
+        fi
+        
+        if [ "$found_prefix" = false ]; then
+          # Extract tag template from source array, e.g., git+xxx#tag=v$pkgver
+          local src_tag_tmpl=""
+          src_tag_tmpl=$(pkgbuild_path="$pkgbuild_path" bash -c '
+            source "$pkgbuild_path" &>/dev/null
+            for src in "${source[@]}"; do
+              if [[ "$src" =~ #tag= ]]; then
+                echo "${src##*#tag=}"
+                exit 0
+              fi
+            done
+          ' 2>/dev/null)
+          
+          # Clean and resolve the template's prefix
+          if [ -n "$src_tag_tmpl" ]; then
+            if [[ "$src_tag_tmpl" =~ ^([a-zA-Z0-9_-]*)\$\{?pkgver\}? ]]; then
+              prefix="${BASH_REMATCH[1]}"
+              found_prefix=true
+            fi
+          fi
+        fi
+        
+        # 4. Find max version
+        local max_ver=""
+        while read -r hash ref; do
+          [ -z "$ref" ] && continue
+          local tag_name="${ref#refs/tags/}"
+          [[ "$tag_name" == *^{} ]] && continue
+          
+          if [[ "$tag_name" == "${prefix}"* ]]; then
+            local candidate_ver="${tag_name#"$prefix"}"
+            candidate_ver=$(echo "$candidate_ver" | tr -cd 'a-zA-Z0-9._-')
+            [ -z "$candidate_ver" ] && continue
+            
+            if [ -z "$max_ver" ]; then
+              max_ver="$candidate_ver"
+            else
+              local comp
+              comp=$(compare_versions "$candidate_ver" "$max_ver")
+              if [ "$comp" -gt 0 ]; then
+                max_ver="$candidate_ver"
+              fi
+            fi
+          fi
+        done <<< "$tags_list"
+        
+        if [ -n "$max_ver" ]; then
+          echo "${max_ver}-${current_pkgrel}"
+          return 0
+        fi
+      fi
+    fi
+  fi
+
   # Check if it has a pkgver() function (VCS package)
   if grep -q "^pkgver()" "$pkgbuild_path"; then
-    log_info "Running pkgver() dynamically for VCS package '${pkgname}'..."
+    log_info "Running pkgver() dynamically for VCS package '${pkgname}'..." >&2
     # Run makepkg -od to fetch sources and update PKGBUILD
     # We run in a subshell to not pollute current shell env
     (

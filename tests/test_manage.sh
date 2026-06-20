@@ -179,4 +179,170 @@ run_manage_tests() {
   assert_file_exists "${temp_publish_dir}/test-pkg.pkg.tar.zst" "Package file is published"
   assert_file_not_exists "${temp_publish_dir}/repo.lock" "repo.lock is not published"
   assert_file_not_exists "${temp_publish_dir}/status.json" "status.json is not published"
+
+  # Test Case 12: Git Tag-Object Hash Upgrade
+  log_info "TEST: Git tag-object hash upgrade check..."
+  # Setup mock project git remote
+  local git_remote_dir="${SANDBOX_DIR}/mock-git-remote"
+  mkdir -p "$git_remote_dir"
+  (
+    cd "$git_remote_dir" || exit 1
+    git init --quiet
+    git config user.email "test@example.com"
+    git config user.name "Test Admin"
+    echo "Initial files" > README.md
+    git add README.md
+    git commit -m "initial commit" --quiet
+    
+    # Create annotated tag v1.0.0
+    git tag -a v1.0.0 -m "version 1.0.0"
+  )
+  
+  # Get tag v1.0.0 hash
+  local tag_v1_hash
+  tag_v1_hash=$(git -C "$git_remote_dir" rev-parse v1.0.0)
+  
+  # Create a package branch in our test repository
+  assert_success "./manage.sh create test-git-tag-pkg --scratch" "Create test-git-tag-pkg command"
+  
+  # Write custom PKGBUILD using this format
+  cat <<EOF > packages/test-git-tag-pkg/PKGBUILD
+pkgname=test-git-tag-pkg
+pkgver=1.0.0
+pkgrel=1
+_tag=${tag_v1_hash} # git rev-parse "v\$pkgver"
+source=(git+file://${git_remote_dir}#tag=\$_tag)
+pkgver() {
+  cd "\$pkgname"
+  git describe
+}
+EOF
+  
+  (
+    cd packages/test-git-tag-pkg || exit 1
+    git add PKGBUILD
+    git commit -m "add pkgbuild with tag object hash" --quiet
+  )
+  
+  # Run version check - should be UP-TO-DATE
+  ./manage.sh version-check test-git-tag-pkg > tag_version_output1.txt 2>&1
+  cat tag_version_output1.txt
+  local status_line1
+  status_line1=$(grep "STATUS=" tag_version_output1.txt)
+  assert_equals "STATUS=UP-TO-DATE" "$status_line1" "test-git-tag-pkg reported as UP-TO-DATE initially"
+  rm -f tag_version_output1.txt
+  
+  # Now add a new annotated tag v1.1.0 on the mock remote
+  (
+    cd "$git_remote_dir" || exit 1
+    echo "New release feature" >> README.md
+    git add README.md
+    git commit -m "new feature commit" --quiet
+    git tag -a v1.1.0 -m "version 1.1.0"
+  )
+  
+  local tag_v1_1_hash
+  tag_v1_1_hash=$(git -C "$git_remote_dir" rev-parse v1.1.0)
+  
+  # Run version check again - should be OUT-OF-DATE
+  ./manage.sh version-check test-git-tag-pkg > tag_version_output2.txt 2>&1
+  cat tag_version_output2.txt
+  local status_line2
+  status_line2=$(grep "STATUS=" tag_version_output2.txt)
+  assert_equals "STATUS=OUT-OF-DATE" "$status_line2" "test-git-tag-pkg reported as OUT-OF-DATE after new remote tag"
+  rm -f tag_version_output2.txt
+  
+  # Run upgrade
+  assert_success "./manage.sh upgrade test-git-tag-pkg" "Upgrade test-git-tag-pkg"
+  
+  # Verify that the PKGBUILD was updated correctly
+  local updated_pkgver
+  updated_pkgver=$(git show test-git-tag-pkg:PKGBUILD | grep "^pkgver=" | cut -d'=' -f2)
+  assert_equals "1.1.0" "$updated_pkgver" "PKGBUILD pkgver updated to 1.1.0"
+  
+  local updated_tag_hash
+  updated_tag_hash=$(git show test-git-tag-pkg:PKGBUILD | grep "^_tag=" | cut -d'=' -f2 | cut -d' ' -f1)
+  assert_equals "$tag_v1_1_hash" "$updated_tag_hash" "PKGBUILD _tag updated to new tag object hash"
+  
+  local updated_pkgrel
+  updated_pkgrel=$(git show test-git-tag-pkg:PKGBUILD | grep "^pkgrel=" | cut -d'=' -f2)
+  assert_equals "1" "$updated_pkgrel" "PKGBUILD pkgrel updated to 1"
+  
+  # Delete package to clean up
+  assert_success "./manage.sh delete test-git-tag-pkg" "Delete test-git-tag-pkg"
+
+  # Test Case 13: Git Tag Name Upgrade
+  log_info "TEST: Git tag name upgrade check..."
+  # Setup mock project git remote
+  local git_remote_dir2="${SANDBOX_DIR}/mock-git-remote2"
+  mkdir -p "$git_remote_dir2"
+  (
+    cd "$git_remote_dir2" || exit 1
+    git init --quiet
+    git config user.email "test@example.com"
+    git config user.name "Test Admin"
+    echo "Initial files" > README.md
+    git add README.md
+    git commit -m "initial commit" --quiet
+    
+    # Create tag 1.0.0 (no prefix)
+    git tag 1.0.0
+  )
+  
+  # Create a package branch in our test repository
+  assert_success "./manage.sh create test-git-tagname-pkg --scratch" "Create test-git-tagname-pkg command"
+  
+  # Write custom PKGBUILD using tag name pinning
+  cat <<EOF > packages/test-git-tagname-pkg/PKGBUILD
+pkgname=test-git-tagname-pkg
+pkgver=1.0.0
+pkgrel=1
+source=(git+file://${git_remote_dir2}#tag=\$pkgver)
+EOF
+  
+  (
+    cd packages/test-git-tagname-pkg || exit 1
+    git add PKGBUILD
+    git commit -m "add pkgbuild with tag name source" --quiet
+  )
+  
+  # Run version check - should be UP-TO-DATE
+  ./manage.sh version-check test-git-tagname-pkg > tagname_version_output1.txt 2>&1
+  cat tagname_version_output1.txt
+  local status_line1
+  status_line1=$(grep "STATUS=" tagname_version_output1.txt)
+  assert_equals "STATUS=UP-TO-DATE" "$status_line1" "test-git-tagname-pkg reported as UP-TO-DATE initially"
+  rm -f tagname_version_output1.txt
+  
+  # Now add a new tag 1.1.0 on the mock remote
+  (
+    cd "$git_remote_dir2" || exit 1
+    echo "New release feature" >> README.md
+    git add README.md
+    git commit -m "new feature commit" --quiet
+    git tag 1.1.0
+  )
+  
+  # Run version check again - should be OUT-OF-DATE
+  ./manage.sh version-check test-git-tagname-pkg > tagname_version_output2.txt 2>&1
+  cat tagname_version_output2.txt
+  local status_line2
+  status_line2=$(grep "STATUS=" tagname_version_output2.txt)
+  assert_equals "STATUS=OUT-OF-DATE" "$status_line2" "test-git-tagname-pkg reported as OUT-OF-DATE after new remote tag"
+  rm -f tagname_version_output2.txt
+  
+  # Run upgrade
+  assert_success "./manage.sh upgrade test-git-tagname-pkg" "Upgrade test-git-tagname-pkg"
+  
+  # Verify that the PKGBUILD was updated correctly
+  local updated_pkgver2
+  updated_pkgver2=$(git show test-git-tagname-pkg:PKGBUILD | grep "^pkgver=" | cut -d'=' -f2)
+  assert_equals "1.1.0" "$updated_pkgver2" "PKGBUILD pkgver updated to 1.1.0"
+  
+  local updated_pkgrel2
+  updated_pkgrel2=$(git show test-git-tagname-pkg:PKGBUILD | grep "^pkgrel=" | cut -d'=' -f2)
+  assert_equals "1" "$updated_pkgrel2" "PKGBUILD pkgrel updated to 1"
+  
+  # Delete package to clean up
+  assert_success "./manage.sh delete test-git-tagname-pkg" "Delete test-git-tagname-pkg"
 }

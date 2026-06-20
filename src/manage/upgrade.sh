@@ -226,6 +226,109 @@ perform_actual_upgrade() {
     # VCS Upgrade
     # VCS pkgver update is done by running makepkg -od to pull new commits
     log_info "Updating package using VCS pkgver extraction..."
+    
+    if grep -q "git\+.*#tag=" PKGBUILD; then
+      log_info "Updating git tag-pinned version in PKGBUILD..."
+      local max_ver="${upstream_ver%-*}"
+      
+      # Get source URL
+      local src_url=""
+      src_url=$(bash -c '
+        source PKGBUILD &>/dev/null
+        for src in "${source[@]}"; do
+          if [[ "$src" =~ git\+ ]]; then
+            url="${src#git+}"
+            url="${url%%\?*}"
+            url="${url%%#*}"
+            echo "$url"
+            exit 0
+          fi
+        done
+      ' 2>/dev/null)
+      
+      if [ -n "$src_url" ]; then
+        local tags_list
+        tags_list=$(git ls-remote --tags "$src_url" 2>/dev/null)
+        
+        # Detect prefix
+        local prefix=""
+        local found_prefix=false
+        local current_pkgver
+        current_pkgver=$(grep -E "^pkgver=" PKGBUILD | cut -d'=' -f2- | tr -d '"'\')
+        while read -r hash ref; do
+          [ -z "$ref" ] && continue
+          local tag_name="${ref#refs/tags/}"
+          [[ "$tag_name" == *^{} ]] && continue
+          if [[ "$tag_name" == *"${current_pkgver}" ]]; then
+            prefix="${tag_name%"${current_pkgver}"}"
+            found_prefix=true
+            break
+          fi
+        done <<< "$tags_list"
+        
+        if [ "$found_prefix" = false ]; then
+          local tag_line
+          tag_line=$(grep -E "^\s*_tag=" PKGBUILD)
+          if [[ "$tag_line" =~ git\ rev-parse\ [\'\"]?([a-zA-Z0-9_-]*)\$pkgver ]]; then
+            prefix="${BASH_REMATCH[1]}"
+            found_prefix=true
+          fi
+        fi
+        
+        if [ "$found_prefix" = false ]; then
+          # Extract tag template from source array, e.g., git+xxx#tag=v$pkgver
+          local src_tag_tmpl=""
+          src_tag_tmpl=$(bash -c '
+            source PKGBUILD &>/dev/null
+            for src in "${source[@]}"; do
+              if [[ "$src" =~ #tag= ]]; then
+                echo "${src##*#tag=}"
+                exit 0
+              fi
+            done
+          ' 2>/dev/null)
+          
+          # Clean and resolve the template's prefix
+          if [ -n "$src_tag_tmpl" ]; then
+            if [[ "$src_tag_tmpl" =~ ^([a-zA-Z0-9_-]*)\$\{?pkgver\}? ]]; then
+              prefix="${BASH_REMATCH[1]}"
+              found_prefix=true
+            fi
+          fi
+        fi
+        
+        # If tag-object hash pinning standard is used, we must update _tag
+        if grep -q "^\s*_tag=" PKGBUILD && grep -q "#tag=\$_tag" PKGBUILD; then
+          local target_tag="${prefix}${max_ver}"
+          local max_hash=""
+          while read -r hash ref; do
+            [ -z "$ref" ] && continue
+            local tag_name="${ref#refs/tags/}"
+            if [ "$tag_name" = "$target_tag" ]; then
+              max_hash="$hash"
+              break
+            fi
+          done <<< "$tags_list"
+          
+          if [ -n "$max_hash" ]; then
+            sed -i "s/^\(\s*_tag=\)\S*\(.*\)/\1${max_hash}\2/" PKGBUILD
+            log_info "PKGBUILD updated with new tag object hash: ${max_hash}"
+          else
+            log_error "Could not find remote tag '${target_tag}' to obtain object hash."
+            return 1
+          fi
+        fi
+        
+        # Update pkgver and pkgrel in all cases
+        sed -i "s/^\(\s*pkgver=\)\S*\(.*\)/\1${max_ver}\2/" PKGBUILD
+        sed -i "s/^\(\s*pkgrel=\)\S*\(.*\)/\11\2/" PKGBUILD
+        log_info "PKGBUILD updated with version: ${max_ver}"
+      else
+        log_error "Could not extract source git URL from PKGBUILD."
+        return 1
+      fi
+    fi
+
     export PACMAN=true # Mock pacman
     makepkg -od --nodeps --noconfirm >/dev/null 2>&1
     
