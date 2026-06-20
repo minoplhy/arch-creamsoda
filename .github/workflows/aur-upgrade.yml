@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Install System Dependencies
         run: |
-          pacman -Syu --noconfirm git jq curl base-devel sudo
+          pacman -Syu --noconfirm git jq curl base-devel sudo github-cli
 
       - name: Checkout Repository with Full History
         uses: actions/checkout@v4
