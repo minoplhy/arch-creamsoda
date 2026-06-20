@@ -366,32 +366,36 @@ perform_actual_upgrade() {
       fi
     fi
     
-    # Try merging
-    log_info "Merging upstream AUR branch '${remote_branch}'..."
-    local merge_opts=""
+    # Try rebasing
+    log_info "Rebasing onto upstream AUR branch '${remote_branch}'..."
+    local rebase_opts=""
     if [ "$conflict_strategy" = "ours" ]; then
-      merge_opts="-X ours"
+      # In rebase, 'theirs' is the current branch (local), 'ours' is the upstream.
+      # To favor local changes (ours in merge), we use -X theirs in rebase.
+      rebase_opts="-X theirs"
     elif [ "$conflict_strategy" = "theirs" ]; then
-      merge_opts="-X theirs"
+      # To favor upstream changes (theirs in merge), we use -X ours in rebase.
+      rebase_opts="-X ours"
     fi
 
-    # Attempt merge
-    if git merge --no-edit $merge_opts "${temp_remote}/${remote_branch}" >/dev/null 2>&1; then
-      # Merge succeeded cleanly
+    # Attempt rebase
+    if git rebase $rebase_opts "${temp_remote}/${remote_branch}" >/dev/null 2>&1; then
+      # Rebase succeeded cleanly
       git remote remove "$temp_remote" >/dev/null 2>&1
       return 0
     else
-      # Merge conflict detected
+      # Rebase conflict detected
       if [ "$conflict_strategy" = "abort" ]; then
-        log_warning "Merge conflict occurred. Aborting merge (CONFLICT_STRATEGY=abort)..."
-        git merge --abort >/dev/null 2>&1
+        log_warning "Rebase conflict occurred. Aborting rebase (CONFLICT_STRATEGY=abort)..."
+        git rebase --abort >/dev/null 2>&1
         git remote remove "$temp_remote" >/dev/null 2>&1
         return 1
       else
         # Resolved using ours/theirs strategy
-        log_warning "Conflict occurred and was resolved automatically (CONFLICT_STRATEGY=${conflict_strategy})."
+        log_warning "Conflict occurred but was mostly resolved (CONFLICT_STRATEGY=${conflict_strategy}). Aborting as rebase still paused."
+        git rebase --abort >/dev/null 2>&1
         git remote remove "$temp_remote" >/dev/null 2>&1
-        return 0
+        return 1
       fi
     fi
   fi
