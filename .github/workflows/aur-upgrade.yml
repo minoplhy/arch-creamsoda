@@ -48,10 +48,36 @@ jobs:
         run: |
           # Run the scanning and upgrading loop as the builder user so makepkg succeeds
           sudo -u builder -i sh -c "
+            echo \"=== Configuring Git Credentials and Safe Directory for Builder User ===\"
+            git config --global --add safe.directory \"$GITHUB_WORKSPACE\"
+            git config --global user.name \"github-actions[bot]\"
+            git config --global user.email \"github-actions[bot]@users.noreply.github.com\"
+            
             cd \"$GITHUB_WORKSPACE\"
+            
+            echo \"=== Repository Status ===\"
+            echo \"Current User: \$(whoami)\"
+            echo \"Current Directory: \$(pwd)\"
+            git status
+            
+            echo \"=== Fetching Remote Branches ===\"
+            git fetch --all --prune
+            
+            echo \"=== Recreating Local Tracking Branches ===\"
+            for remote_ref in \$(git for-each-ref --format='%(refname)' refs/remotes/origin/); do
+              branch=\${remote_ref#refs/remotes/origin/}
+              if [ \"\$branch\" = \"HEAD\" ] || [ \"\$branch\" = \"master\" ] || [ \"\$branch\" = \"main\" ] || [[ \"\$branch\" =~ ^upgrade/ ]]; then
+                continue
+              fi
+              echo \"Tracking remote branch: \$branch -> origin/\$branch\"
+              git branch -f \"\$branch\" \"origin/\$branch\" || true
+            done
             
             # Get all local branch names tracking package streams
             branches=\$(git for-each-ref --format='%(refname:short)' refs/heads/)
+            echo \"=== Branches Found for Scanning ===\"
+            echo \"\$branches\"
+            echo \"==================================================\"
             
             for branch in \$branches; do
               # Skip master, main and temporary upgrade branches
@@ -77,3 +103,4 @@ jobs:
               echo \"\"
             done
           "
+
