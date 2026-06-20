@@ -56,3 +56,113 @@ list_gpg_keys() {
     gpg "${gpg_opts[@]}" --list-keys
   fi
 }
+
+sign_repository() {
+  local gpg_key="${GPG_KEY:-}"
+  local gnupg_home="${GNUPGHOME:-}"
+  
+  # Parse arguments
+  while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+      --key)
+        gpg_key="$2"
+        shift 2
+        ;;
+      --gnupghome)
+        gnupg_home="$2"
+        shift 2
+        ;;
+      *)
+        log_error "Unknown option: $1"
+        exit 1
+        ;;
+    esac
+  done
+  
+  if [ -z "$gpg_key" ]; then
+    log_error "GPG Key ID is required for signing. Please specify with --key <key_id> or configure GPG_KEY in config.conf."
+    exit 1
+  fi
+  
+  # Set up GPG options
+  local gpg_opts=("--no-permission-warning")
+  if [ -n "$gnupg_home" ]; then
+    gpg_opts+=("--homedir" "$gnupg_home")
+  fi
+  
+  # Verify that the key is present in the keyring
+  if ! gpg "${gpg_opts[@]}" --list-keys "$gpg_key" >/dev/null 2>&1; then
+    log_error "GPG Key '$gpg_key' was not found in the keyring."
+    if [ -n "$gnupg_home" ]; then
+      log_error "Check that the key has been imported into GNUPGHOME '$gnupg_home'."
+    else
+      log_error "Import it first using: ./manage.sh import-key $gpg_key"
+    fi
+    exit 1
+  fi
+  
+  log_info "Signing all packages in the repository with key '$gpg_key'..."
+  local signed_packages_count=0
+  for pkg in "${REPO_DIR}"/*.pkg.tar.*; do
+    [ -e "$pkg" ] || continue
+    [[ "$pkg" =~ \.sig$ ]] && continue
+    [[ "$pkg" =~ \.log$ ]] && continue
+    
+    log_info "Signing package $(basename "$pkg")..."
+    local p_gpg_opts=("${gpg_opts[@]}" "--detach-sign" "--no-armor" "--use-agent" "-u" "$gpg_key")
+    rm -f "${pkg}.sig"
+    if gpg "${p_gpg_opts[@]}" "$pkg"; then
+      signed_packages_count=$((signed_packages_count + 1))
+    else
+      log_error "Failed to sign package: $(basename "$pkg")"
+      exit 1
+    fi
+  done
+  
+  log_info "Signing database and files files..."
+  local signed_db_count=0
+  for db in "${REPO_DIR}"/*.db.tar.gz "${REPO_DIR}"/*.files.tar.gz; do
+    [ -e "$db" ] || continue
+    log_info "Signing database $(basename "$db")..."
+    local d_gpg_opts=("${gpg_opts[@]}" "--detach-sign" "--no-armor" "--use-agent" "-u" "$gpg_key")
+    rm -f "${db}.sig"
+    if gpg "${d_gpg_opts[@]}" "$db"; then
+      signed_db_count=$((signed_db_count + 1))
+    else
+      log_error "Failed to sign database: $(basename "$db")"
+      exit 1
+    fi
+  done
+  
+  # Re-link signature files if symlinks exist
+  for sym in "${REPO_DIR}"/*.db "${REPO_DIR}"/*.files; do
+    if [ -L "$sym" ]; then
+      local target
+      target=$(readlink "$sym")
+      if [ -f "${sym%/*}/${target}.sig" ]; then
+        rm -f "${sym}.sig"
+        ln -s "${target}.sig" "${sym}.sig"
+      fi
+    fi
+  done
+  
+  log_success "Successfully signed $signed_packages_count packages and $signed_db_count database files."
+  
+  # Forward compatibility: Update config.conf to set SIGN_PACKAGES="true" and save the key
+  log_info "Updating config.conf to persist signing configuration..."
+  update_config_key "SIGN_PACKAGES" "true"
+  update_config_key "GPG_KEY" "$gpg_key"
+  if [ -n "$gnupg_home" ]; then
+    update_config_key "GNUPGHOME" "$gnupg_home"
+  fi
+}
+
+unsign_repository() {
+  log_info "Removing all signatures from the repository directory..."
+  rm -f "${REPO_DIR}"/*.sig
+  log_success "All signatures removed from the repository."
+  
+  # Forward compatibility: Update config.conf to set SIGN_PACKAGES="false"
+  log_info "Updating config.conf to disable signing..."
+  update_config_key "SIGN_PACKAGES" "false"
+}

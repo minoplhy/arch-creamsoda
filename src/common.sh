@@ -161,5 +161,25 @@ release_lock() {
   fi
 }
 
+# Update configuration value in config.conf
+update_config_key() {
+  local key="$1"
+  local val="$2"
+  local file="${WORKSPACE_DIR}/config.conf"
+  
+  if [ ! -f "$file" ]; then
+    log_warning "config.conf not found at ${file}. Cannot update ${key}."
+    return 1
+  fi
+
+  if grep -q "^${key}=" "$file"; then
+    # Key exists, update it using sed
+    sed -i "s|^${key}=.*|${key}=\"${val}\"|g" "$file"
+  else
+    # Key doesn't exist, append it
+    echo -e "\n${key}=\"${val}\"" >> "$file"
+  fi
+}
+
 # Register exit handler to clean up locks
 trap release_lock EXIT

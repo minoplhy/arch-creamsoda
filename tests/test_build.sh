@@ -269,6 +269,47 @@ run_build_tests() {
   git branch -D upgrade/test-ignored-branch --quiet
   rm -f scan_upgrade_output.txt
 
+  # Test Case 14: Sign and Unsign command post-build
+  log_info "TEST: Sign and Unsign command post-build..."
+  # Import mock signing key so gpg --list-keys check passes
+  assert_success "./manage.sh import-key MOCK_SIGNING_KEY_ID" "Import signing key"
+  
+  # First, build all packages with signing disabled
+  rm -rf repo/*
+  # Ensure sign_packages is false in config
+  cp config.conf config.conf.bak
+  sed -i 's/SIGN_PACKAGES=.*/SIGN_PACKAGES="false"/g' config.conf
+  
+  assert_success "./build.sh -f" "Compile packages unsigned"
+  assert_file_exists "repo/custom.db.tar.gz" "Unsigned database created"
+  assert_file_not_exists "repo/custom.db.tar.gz.sig" "No database signature should exist"
+  assert_file_not_exists "repo/librewolf-bin-126.0.0-1-any.pkg.tar.zst.sig" "No package signature should exist"
+  
+  # Run manage.sh sign
+  assert_success "./manage.sh sign --key MOCK_SIGNING_KEY_ID --gnupghome .gnupg" "Sign existing unsigned repository"
+  assert_file_exists "repo/custom.db.tar.gz.sig" "Database signature created post-build"
+  assert_file_exists "repo/librewolf-bin-126.0.0-1-any.pkg.tar.zst.sig" "Package signature created post-build"
+  
+  # Verify config.conf was updated (forward compatibility)
+  local config_sign_packages
+  config_sign_packages=$(grep "^SIGN_PACKAGES=" config.conf | cut -d'=' -f2 | tr -d '"'\')
+  assert_equals "true" "$config_sign_packages" "SIGN_PACKAGES was enabled in config.conf"
+  local config_gpg_key
+  config_gpg_key=$(grep "^GPG_KEY=" config.conf | cut -d'=' -f2 | tr -d '"'\')
+  assert_equals "MOCK_SIGNING_KEY_ID" "$config_gpg_key" "GPG_KEY was saved in config.conf"
+  
+  # Run manage.sh unsign
+  assert_success "./manage.sh unsign" "Unsign repository"
+  assert_file_not_exists "repo/custom.db.tar.gz.sig" "Database signature removed"
+  assert_file_not_exists "repo/librewolf-bin-126.0.0-1-any.pkg.tar.zst.sig" "Package signature removed"
+  
+  # Verify config.conf was updated to SIGN_PACKAGES="false"
+  config_sign_packages=$(grep "^SIGN_PACKAGES=" config.conf | cut -d'=' -f2 | tr -d '"'\')
+  assert_equals "false" "$config_sign_packages" "SIGN_PACKAGES was disabled in config.conf"
+  
+  # Restore config
+  mv config.conf.bak config.conf
+
   # Cleanup
   ./manage.sh delete pgp-pkg >/dev/null
   rm -f gpg_imports.log build_gpg_warn.txt build_gpg_clean.txt

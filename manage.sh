@@ -40,6 +40,11 @@ show_help() {
   echo -e "  import-key <key_id...>                   Import trusted GPG public key(s) into the keyring"
   echo -e "  list-keys                                List GPG public keys in the repository keyring"
   echo -e "  publish                                  Publish/Sync the built package repository"
+  echo -e "  sign [options]                           Sign all packages and databases in the repository"
+  echo -e "  unsign                                   Remove all signatures from the repository and disable signing"
+  echo -e "      Options for sign:"
+  echo -e "         --key <key_id>                    GPG Key ID to use for signing"
+  echo -e "         --gnupghome <dir>                 GPG home directory (optional)"
   echo -e "      Options for upgrade:"
   echo -e "         -f, --force                       Force upgrade even if local version is newer"
   echo -e "         --ours                            Resolve merge conflicts by keeping local version"
@@ -115,6 +120,15 @@ case "$cmd" in
   publish)
     acquire_lock
     publish_repository
+    ;;
+  sign)
+    shift
+    acquire_lock
+    sign_repository "$@"
+    ;;
+  unsign)
+    acquire_lock
+    unsign_repository
     ;;
   -h|--help|"")
     show_help
