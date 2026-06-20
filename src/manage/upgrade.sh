@@ -388,10 +388,11 @@ perform_actual_upgrade() {
         git remote remove "$temp_remote" >/dev/null 2>&1
         return 1
       else
-        # Resolved using ours/theirs strategy
-        log_warning "Conflict occurred and was resolved automatically (CONFLICT_STRATEGY=${conflict_strategy})."
+        # Conflict occurred and was NOT fully resolved even with ours/theirs strategy
+        log_warning "Conflict occurred and could not be fully resolved automatically (CONFLICT_STRATEGY=${conflict_strategy}). Aborting merge."
+        git merge --abort >/dev/null 2>&1
         git remote remove "$temp_remote" >/dev/null 2>&1
-        return 0
+        return 1
       fi
     fi
   fi
