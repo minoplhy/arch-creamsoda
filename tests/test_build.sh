@@ -253,6 +253,22 @@ run_build_tests() {
   compiled_librewolf_all=$(find logs/ -name "librewolf-bin-*.log" | wc -l)
   assert_equals "1" "$compiled_librewolf_all" "librewolf-bin was force rebuilt"
 
+  # Test Case 13: Exclusion of upgrade/ branches in scan
+  log_info "TEST: Exclusion of upgrade/ branches in scan..."
+  # Create a branch starting with upgrade/ without checking it out
+  git branch upgrade/test-ignored-branch librewolf-bin
+  
+  # Run scan-only and capture output
+  ./build.sh --scan-only > scan_upgrade_output.txt
+  
+  local upgrade_branch_scanned
+  upgrade_branch_scanned=$(grep -c "upgrade/test-ignored-branch" scan_upgrade_output.txt)
+  assert_equals "0" "$upgrade_branch_scanned" "upgrade/ branches are excluded from scan"
+  
+  # Delete the test branch
+  git branch -D upgrade/test-ignored-branch --quiet
+  rm -f scan_upgrade_output.txt
+
   # Cleanup
   ./manage.sh delete pgp-pkg >/dev/null
   rm -f gpg_imports.log build_gpg_warn.txt build_gpg_clean.txt

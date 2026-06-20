@@ -52,7 +52,7 @@ scan_packages_for_changes() {
   local build_count=0
 
   for branch in $branches; do
-    if [ "$branch" = "master" ] || [ "$branch" = "main" ]; then
+    if [ "$branch" = "master" ] || [ "$branch" = "main" ] || [[ "$branch" =~ ^upgrade/ ]]; then
       continue
     fi
     

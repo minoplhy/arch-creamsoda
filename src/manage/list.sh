@@ -6,6 +6,7 @@ parse_pkgbuild_version() {
   local content="$1"
   local pkgver=""
   local pkgrel=""
+  local epoch=""
   
   while IFS= read -r line; do
     # Remove comments
@@ -15,23 +16,31 @@ parse_pkgbuild_version() {
     
     if [[ "$line" =~ ^pkgver= ]]; then
       pkgver="${line#pkgver=}"
-      # Strip quotes
       pkgver="${pkgver#\"}"
       pkgver="${pkgver%\"}"
       pkgver="${pkgver#\'}"
       pkgver="${pkgver%\'}"
     elif [[ "$line" =~ ^pkgrel= ]]; then
       pkgrel="${line#pkgrel=}"
-      # Strip quotes
       pkgrel="${pkgrel#\"}"
       pkgrel="${pkgrel%\"}"
       pkgrel="${pkgrel#\'}"
       pkgrel="${pkgrel%\'}"
+    elif [[ "$line" =~ ^epoch= ]]; then
+      epoch="${line#epoch=}"
+      epoch="${epoch#\"}"
+      epoch="${epoch%\"}"
+      epoch="${epoch#\'}"
+      epoch="${epoch%\'}"
     fi
   done <<< "$content"
 
   if [ -n "$pkgver" ] && [ -n "$pkgrel" ]; then
-    echo "${pkgver}-${pkgrel}"
+    if [ -n "$epoch" ]; then
+      echo "${epoch}:${pkgver}-${pkgrel}"
+    else
+      echo "${pkgver}-${pkgrel}"
+    fi
   else
     echo "unknown"
   fi

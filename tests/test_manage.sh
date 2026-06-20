@@ -345,4 +345,26 @@ EOF
   
   # Delete package to clean up
   assert_success "./manage.sh delete test-git-tagname-pkg" "Delete test-git-tagname-pkg"
+
+  # Test Case 14: Parse PKGBUILD version with epoch
+  log_info "TEST: parse_pkgbuild_version parsing of epoch..."
+  # Source list.sh if not already sourced
+  source "src/manage/list.sh"
+  
+  local pkgbuild_no_epoch="pkgname=test-pkg
+pkgver=1.2.3
+pkgrel=4
+"
+  local parsed_no_epoch
+  parsed_no_epoch=$(parse_pkgbuild_version "$pkgbuild_no_epoch")
+  assert_equals "1.2.3-4" "$parsed_no_epoch" "parse_pkgbuild_version parsed version without epoch"
+
+  local pkgbuild_with_epoch="pkgname=test-pkg-epoch
+epoch=2
+pkgver=1.2.3
+pkgrel=4
+"
+  local parsed_with_epoch
+  parsed_with_epoch=$(parse_pkgbuild_version "$pkgbuild_with_epoch")
+  assert_equals "2:1.2.3-4" "$parsed_with_epoch" "parse_pkgbuild_version parsed version with epoch"
 }
