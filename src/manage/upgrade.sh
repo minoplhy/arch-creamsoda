@@ -168,12 +168,12 @@ upgrade_package() {
         if [ "$conflict_strategy" = "theirs" ] || [ "$conflict_strategy" = "ours" ]; then
           pr_body="${pr_body}\n\n⚠️ **Warning:** A git merge conflict occurred and was resolved automatically using the \`${conflict_strategy}\` strategy."
         fi
-        
         # Open the PR targeting the package branch
-        if gh pr create --base "$pkgname" --head "$pr_branch" --title "$pr_title" --body "$pr_body" --label "aur-upgrade" >/dev/null 2>&1; then
+        local pr_output
+        if pr_output=$(gh pr create --base "$pkgname" --head "$pr_branch" --title "$pr_title" --body "$pr_body" --label "aur-upgrade" 2>&1); then
           log_success "Pull Request created successfully!"
         else
-          log_warning "Could not create Pull Request via 'gh' CLI. Ensure you are authenticated."
+          log_warning "Could not create Pull Request via 'gh' CLI. Error: $pr_output"
         fi
       else
         log_warning "GitHub CLI ('gh') is not installed. Skipping PR creation."
