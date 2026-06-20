@@ -60,6 +60,10 @@ jobs:
           echo "Current Directory: $(pwd)"
           git status
           
+          echo "=== Initializing GitHub Labels ==="
+          gh label create "aur-upgrade" --color "0e8a16" --description "Automated AUR package upgrade" 2>/dev/null || true
+          export AUR_LABEL_CREATED=1
+          
           echo "=== Fetching Remote Branches ==="
           git fetch --all --prune
           

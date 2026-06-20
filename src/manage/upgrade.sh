@@ -168,6 +168,12 @@ upgrade_package() {
         if [ "$conflict_strategy" = "theirs" ] || [ "$conflict_strategy" = "ours" ]; then
           pr_body="${pr_body}\n\n⚠️ **Warning:** A git merge conflict occurred and was resolved automatically using the \`${conflict_strategy}\` strategy."
         fi
+        # Ensure the label exists (only try once per session to avoid API rate limits)
+        if [ "$AUR_LABEL_CREATED" != "1" ]; then
+          gh label create "aur-upgrade" --color "0e8a16" --description "Automated AUR package upgrade" 2>/dev/null || true
+          export AUR_LABEL_CREATED=1
+        fi
+
         # Open the PR targeting the package branch
         local pr_output
         if pr_output=$(gh pr create --base "$pkgname" --head "$pr_branch" --title "$pr_title" --body "$pr_body" --label "aur-upgrade" 2>&1); then
