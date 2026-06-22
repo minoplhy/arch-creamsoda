@@ -91,7 +91,7 @@ case "$cmd" in
       # Loop through all packages
       branches=$(git for-each-ref --format='%(refname:short)' refs/heads/)
       for branch in $branches; do
-        if [ "$branch" = "master" ] || [ "$branch" = "main" ]; then
+        if [ "$branch" = "master" ] || [ "$branch" = "main" ] || [[ "$branch" == upgrade-* ]] || [[ "$branch" == upgrade/* ]] || [[ "$branch" == updates-* ]] || [[ "$branch" == updates/* ]]; then
           continue
         fi
         check_package_version "$branch"

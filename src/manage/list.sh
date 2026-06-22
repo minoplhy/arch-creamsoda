@@ -58,7 +58,7 @@ list_packages() {
 
   local count=0
   for branch in $branches; do
-    if [ "$branch" = "master" ] || [ "$branch" = "main" ]; then
+    if [ "$branch" = "master" ] || [ "$branch" = "main" ] || [[ "$branch" == upgrade-* ]] || [[ "$branch" == upgrade/* ]] || [[ "$branch" == updates-* ]] || [[ "$branch" == updates/* ]]; then
       continue
     fi
     
