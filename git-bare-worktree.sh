@@ -284,7 +284,7 @@ cmd_sync_packages() {
     fi
     local branch_name="${short_ref#origin/}"
     # Ignore main branches, HEAD pointer, and upgrade/PR branches
-    if [ "$branch_name" = "master" ] || [ "$branch_name" = "main" ] || [ "$branch_name" = "HEAD" ] || [[ "$branch_name" == upgrade-* ]]; then
+    if [ "$branch_name" = "master" ] || [ "$branch_name" = "main" ] || [ "$branch_name" = "HEAD" ] || [[ "$branch_name" == upgrade-* ]] || [[ "$branch_name" == upgrade/* ]]; then
       continue
     fi
     branches+=("$branch_name")

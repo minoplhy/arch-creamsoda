@@ -134,7 +134,9 @@ upgrade_package() {
   if [ "$pr_flag" = true ]; then
     # PR-Based Upgrade Workflow (Automation/CI)
     log_info "Running in PR mode. Creating temporary upgrade branch..."
-    local pr_branch="upgrade/${pkgname}-to-${upstream_ver}"
+    local sanitized_ver
+    sanitized_ver=$(echo "$upstream_ver" | tr ':' '-')
+    local pr_branch="upgrade/${pkgname}-to-${sanitized_ver}"
     
     # Check if branch already exists
     if git show-ref --verify --quiet "refs/heads/${pr_branch}"; then

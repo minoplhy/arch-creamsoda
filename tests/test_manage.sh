@@ -367,4 +367,55 @@ pkgrel=4
   local parsed_with_epoch
   parsed_with_epoch=$(parse_pkgbuild_version "$pkgbuild_with_epoch")
   assert_equals "2:1.2.3-4" "$parsed_with_epoch" "parse_pkgbuild_version parsed version with epoch"
+
+  # Test Case 15: Epoch Version PR Upgrade Branch Name Sanitization
+  log_info "TEST: Epoch version PR upgrade branch name sanitization..."
+  
+  # Setup mock project git remote
+  local git_remote_dir3="${SANDBOX_DIR}/mock-git-remote3"
+  mkdir -p "$git_remote_dir3"
+  (
+    cd "$git_remote_dir3" || exit 1
+    git init --quiet
+    git config user.email "test@example.com"
+    git config user.name "Test Admin"
+    echo "Initial files" > README.md
+    git add README.md
+    git commit -m "initial commit" --quiet
+    git tag 1.0.0
+  )
+  
+  # Create a package branch with epoch in the test repo
+  assert_success "./manage.sh create test-epoch-pkg --scratch" "Create test-epoch-pkg command"
+  
+  # Write custom PKGBUILD using epoch version
+  cat <<EOF > packages/test-epoch-pkg/PKGBUILD
+pkgname=test-epoch-pkg
+epoch=1
+pkgver=1.0.0
+pkgrel=1
+source=(git+file://${git_remote_dir3}#tag=\$pkgver)
+EOF
+  
+  (
+    cd packages/test-epoch-pkg || exit 1
+    git add PKGBUILD
+    git commit -m "add pkgbuild with epoch version" --quiet
+  )
+  
+  # Add a new version tag 1.1.0 on the mock remote
+  (
+    cd "$git_remote_dir3" || exit 1
+    echo "New version feature" >> README.md
+    git add README.md
+    git commit -m "new version commit" --quiet
+    git tag 1.1.0
+  )
+  
+  # Run upgrade in PR mode.
+  # This verifies that git does not fail with "invalid branch name" because of the colon.
+  assert_success "./manage.sh upgrade test-epoch-pkg --pr" "PR upgrade test-epoch-pkg with epoch version succeeds"
+  
+  # Delete package to clean up
+  assert_success "./manage.sh delete test-epoch-pkg" "Delete test-epoch-pkg"
 }
