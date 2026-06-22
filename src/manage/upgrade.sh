@@ -179,7 +179,7 @@ upgrade_package() {
         # Open the PR targeting the package branch
         local pr_output
         if pr_output=$(gh pr create --base "$pkgname" --head "$pr_branch" --title "$pr_title" --body "$pr_body" --label "aur-upgrade" 2>&1); then
-          log_success "Pull Request created successfully!"
+          log_success "Pull Request created successfully: $pr_output"
         else
           log_warning "Could not create Pull Request via 'gh' CLI. Error: $pr_output"
         fi

@@ -83,6 +83,10 @@ jobs:
             fi
           done
           
+          # Initialize results log
+          REPORT_FILE="$GITHUB_WORKSPACE/upgrade_results.txt"
+          > "$REPORT_FILE"
+          
           # Get all local branch names tracking package streams
           branches=$(git for-each-ref --format='%(refname:short)' refs/heads/)
           echo "=== Branches Found for Scanning ==="
@@ -100,15 +104,46 @@ jobs:
             echo "================================================================================"
             
             # Check version status
-            ./manage.sh version-check "$branch"
+            version_output=$(./manage.sh version-check "$branch" 2>&1)
             check_status=$?
+            echo "$version_output"
             
-            if [ $check_status -eq 2 ]; then
+            # Extract local and upstream versions
+            local_ver=$(echo "$version_output" | grep "^LOCAL=" | cut -d'=' -f2-)
+            upstream_ver=$(echo "$version_output" | grep "^UPSTREAM=" | cut -d'=' -f2-)
+            
+            [ -z "$local_ver" ] && local_ver="unknown"
+            [ -z "$upstream_ver" ] && upstream_ver="unknown"
+            
+            if [ $check_status -eq 0 ]; then
+              # Already up to date: successful
+              echo "$branch|successful|$local_ver|$upstream_ver|Package is up-to-date" >> "$REPORT_FILE"
+            elif [ $check_status -eq 2 ]; then
               # Status 2 indicates OUT-OF-DATE. Attempt to run upgrade in PR mode.
               echo "Package '$branch' is out-of-date. Opening PR..."
-              ./manage.sh upgrade "$branch" --pr || echo "Failed to create PR upgrade for '$branch'."
+              upgrade_output=$(./manage.sh upgrade "$branch" --pr 2>&1)
+              upgrade_status=$?
+              echo "$upgrade_output"
+              
+              if [ $upgrade_status -eq 0 ]; then
+                # Successfully upgraded/bumped
+                pr_url=$(echo "$upgrade_output" | grep -o -E "https://github.com/[^/]+/[^/]+/pull/[0-9]+")
+                if [ -n "$pr_url" ]; then
+                  echo "$branch|bump|$local_ver|$upstream_ver|Upgrade PR opened: $pr_url" >> "$REPORT_FILE"
+                else
+                  echo "$branch|bump|$local_ver|$upstream_ver|Upgrade PR opened" >> "$REPORT_FILE"
+                fi
+              else
+                # Upgrade failed
+                err_msg=$(echo "$upgrade_output" | grep -iE "error|fail" | tail -n 1 | tr -d '|' | cut -c1-100)
+                [ -z "$err_msg" ] && err_msg="Upgrade failed"
+                echo "$branch|failed|$local_ver|$upstream_ver|$err_msg" >> "$REPORT_FILE"
+              fi
             else
-              echo "Package '$branch' does not require updates (status code: $check_status)."
+              # Version check failed
+              err_msg=$(echo "$version_output" | grep -iE "error|fail" | tail -n 1 | tr -d '|' | cut -c1-100)
+              [ -z "$err_msg" ] && err_msg="Version check failed"
+              echo "$branch|failed|$local_ver|$upstream_ver|$err_msg" >> "$REPORT_FILE"
             fi
             echo ""
           done
@@ -119,5 +154,44 @@ jobs:
           
           # Run the script as the builder user
           sudo -u builder -i sh -c "export GITHUB_WORKSPACE='$GITHUB_WORKSPACE' GITHUB_TOKEN='$GITHUB_TOKEN'; /bin/bash '$GITHUB_WORKSPACE/run-upgrade.sh'"
+          
+          # Process results and write to Step Summary
+          REPORT_FILE="$GITHUB_WORKSPACE/upgrade_results.txt"
+          if [ -f "$REPORT_FILE" ]; then
+            echo "=== Generating Step Summary Report ==="
+            {
+              echo "### 📦 Scheduled Package Upgrade Report"
+              echo ""
+              echo "| Package | Status | Local Version | Upstream Version | Details |"
+              echo "| :--- | :--- | :--- | :--- | :--- |"
+            } >> "$GITHUB_STEP_SUMMARY"
+            
+            while IFS='|' read -r pkg status local_ver upstream_ver details; do
+              case "$status" in
+                successful)
+                  status_badge="🟢 **successful**"
+                  ;;
+                bump)
+                  status_badge="🔵 **bump**"
+                  if [[ "$details" =~ (https://github.com/[^/]+/[^/]+/pull/[0-9]+) ]]; then
+                    pr_url="${BASH_REMATCH[1]}"
+                    details="[View Pull Request]($pr_url)"
+                  fi
+                  ;;
+                failed)
+                  status_badge="🔴 **failed**"
+                  ;;
+                *)
+                  status_badge="⚪ $status"
+                  ;;
+              esac
+              echo "| \`$pkg\` | $status_badge | \`$local_ver\` | \`$upstream_ver\` | $details |" >> "$GITHUB_STEP_SUMMARY"
+            done < "$REPORT_FILE"
+            
+            rm -f "$REPORT_FILE"
+          else
+            echo "### ⚠️ Package Upgrade Report Error" >> "$GITHUB_STEP_SUMMARY"
+            echo "No upgrade results file found." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
 
