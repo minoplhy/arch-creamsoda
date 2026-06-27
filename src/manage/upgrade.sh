@@ -194,6 +194,9 @@ upgrade_package() {
     git worktree remove --force "$pr_worktree" >/dev/null 2>&1
     git branch -D "$pr_branch" >/dev/null 2>&1
     
+    if [ $upgrade_status -ne 0 ]; then
+      exit "$upgrade_status"
+    fi
   else
     # Direct Upgrade Mode (Local developers running instantly)
     # Check for local uncommitted changes

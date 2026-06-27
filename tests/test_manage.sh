@@ -418,4 +418,69 @@ EOF
   
   # Delete package to clean up
   assert_success "./manage.sh delete test-epoch-pkg" "Delete test-epoch-pkg"
+
+  # Test Case 16: PR Upgrade conflict (abort strategy) fails
+  log_info "TEST: PR Upgrade conflict (abort strategy) fails..."
+  
+  # Setup mock project git remote for conflict
+  local git_remote_dir4="${SANDBOX_DIR}/mock-git-remote4"
+  mkdir -p "$git_remote_dir4"
+  (
+    cd "$git_remote_dir4" || exit 1
+    git init --quiet
+    git config user.email "test@example.com"
+    git config user.name "Test Admin"
+    echo "Initial content" > README.md
+    git add README.md
+    git commit -m "initial commit" --quiet
+    git tag 1.0.0
+  )
+  
+  # Create a package branch in our test repository
+  assert_success "./manage.sh create test-pr-conflict-pkg --scratch" "Create test-pr-conflict-pkg command"
+  
+  # Write custom PKGBUILD pointing to 1.0.0
+  cat <<EOF > packages/test-pr-conflict-pkg/PKGBUILD
+pkgname=test-pr-conflict-pkg
+pkgver=1.0.0
+pkgrel=1
+source=(git+file://${git_remote_dir4}#tag=\$pkgver)
+EOF
+  
+  (
+    cd packages/test-pr-conflict-pkg || exit 1
+    git add PKGBUILD
+    git commit -m "add pkgbuild 1.0.0" --quiet
+  )
+  
+  # Modify local PKGBUILD to conflict
+  echo -e "pkgname=test-pr-conflict-pkg\npkgver=1.0.0\npkgrel=1\n# Local edits that conflict" > packages/test-pr-conflict-pkg/PKGBUILD
+  (
+    cd packages/test-pr-conflict-pkg || exit 1
+    git add PKGBUILD
+    git commit -m "local conflicting edits" --quiet
+  )
+  
+  # Add conflicting version tag 1.1.0 on the mock remote
+  (
+    cd "$git_remote_dir4" || exit 1
+    echo "Upstream conflicting change" > README.md
+    git add README.md
+    git commit -m "upstream change" --quiet
+    git tag 1.1.0
+  )
+  
+  # Configure CONFLICT_STRATEGY="abort" in .pkgconfig
+  sed -i 's/CONFLICT_STRATEGY=.*/CONFLICT_STRATEGY="abort"/g' packages/test-pr-conflict-pkg/.pkgconfig
+  (
+    cd packages/test-pr-conflict-pkg || exit 1
+    git add .pkgconfig
+    git commit -m "set conflict strategy to abort" --quiet
+  )
+  
+  # Run upgrade in PR mode - this should fail!
+  assert_failure "./manage.sh upgrade test-pr-conflict-pkg --pr" "PR upgrade test-pr-conflict-pkg with conflict fails"
+  
+  # Delete package to clean up
+  assert_success "./manage.sh delete test-pr-conflict-pkg" "Delete test-pr-conflict-pkg"
 }
